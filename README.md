@@ -1,7 +1,7 @@
 # Integrantes
 
 - **Matias Duran** — 19499/1  
-- **Maria Josefina Martinez Osti** — 21583/5
+- **Lucio Bianchi Pradas** — 19341/8
 # Network: Sepolia
 - PROJECT_MANAGER_CONTRACT_ADDRESS=0x5f160a757743184F1A665179B55408f0107b8aD5 -- https://sepolia.etherscan.io/address/0x5f160a757743184F1A665179B55408f0107b8aD5
 - CARBON_CREDIT_CONTRACT_ADDRESS=0x7C11396245828083b0c8A2633130Dd99583d2d4B -- https://sepolia.etherscan.io/address/0x7C11396245828083b0c8A2633130Dd99583d2d4B
