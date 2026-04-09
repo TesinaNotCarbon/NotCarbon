@@ -24,6 +24,12 @@ contract Project is IProject {
     event TokensPurchased(address indexed buyer, uint256 amount);
     event ETHWithdrawn(address indexed to, uint256 amount);
 
+    function _refund(address payable to, uint256 amount) internal {
+        if (amount == 0) return;
+        (bool ok, ) = to.call{value: amount}("");
+        require(ok, "Refund failed");
+    }
+
     modifier onlyProjectManager() {
         require(
             msg.sender == projectManager,
@@ -129,6 +135,8 @@ contract Project is IProject {
         // Actualizar la cantidad de tokens comprados
         purchasedTokens += _amount;
 
+        _refund(payable(msg.sender), msg.value - totalCost);
+
         emit TokensPurchased(msg.sender, _amount);
     }
 
@@ -153,6 +161,9 @@ contract Project is IProject {
 
         require(token.transfer(buyer, amount), "Transfer failed");
         purchasedTokens += amount;
+
+        _refund(payable(msg.sender), msg.value - totalCost);
+
         emit TokensPurchased(buyer, amount);
     }
 

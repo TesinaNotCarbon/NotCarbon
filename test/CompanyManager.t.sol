@@ -83,4 +83,9 @@ contract CompanyManagerTest is BaseTest {
 
         companyManager.approveCompany(payable(companyAddress));
     }
+
+    function test_isApproved_revertsIfNotRegistered() public {
+        vm.expectRevert("Empresa no registrada");
+        companyManager.isApproved(payable(address(0x1234)));
+    }
 }

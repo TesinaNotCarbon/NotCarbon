@@ -41,6 +41,7 @@ contract CompanyManager is ICompanyManager {
     }
 
     function isApproved(address payable _companyAddress) external view override returns (bool) {
+        require(registeredCompanies[_companyAddress], "Empresa no registrada");
         Company company = Company(_companyAddress);
         return company.isApproved();
     }

@@ -33,6 +33,7 @@ contract ProjectTest is Test {
         token.transferTokens(address(project), 1000);
 
         vm.deal(buyer, 100 ether);
+        vm.deal(outsider, 100 ether);
         vm.deal(companyOwner, 100 ether);
         vm.deal(creator, 10 ether);
     }
@@ -102,6 +103,16 @@ contract ProjectTest is Test {
         assertEq(project.purchasedTokens(), 5);
     }
 
+    function test_buyCarbonCredits_refundsExcessEth() public {
+        project.updateState(IProject.ProjectState.Phase4);
+        uint256 buyerBalanceBefore = buyer.balance;
+
+        vm.prank(buyer);
+        project.buyCarbonCredits{value: 5 ether}(3);
+
+        assertEq(buyer.balance, buyerBalanceBefore - 3 ether);
+    }
+
     function test_buyFor_revertsWhenCompanyNotApproved() public {
         project.updateState(IProject.ProjectState.Phase4);
 
@@ -132,6 +143,20 @@ contract ProjectTest is Test {
 
         assertEq(token.balanceOf(companyAddress), 3);
         assertEq(project.purchasedTokens(), 3);
+    }
+
+    function test_buyFor_refundsExcessEthToCaller() public {
+        project.updateState(IProject.ProjectState.Phase4);
+        vm.prank(companyOwner);
+        address companyAddress = companyManager.createCompany("Green Corp", 120);
+        companyManager.approveCompany(payable(companyAddress));
+
+        uint256 callerBalanceBefore = outsider.balance;
+
+        vm.prank(outsider);
+        project.buyFor{value: 4 ether}(companyAddress, 2);
+
+        assertEq(outsider.balance, callerBalanceBefore - 2 ether);
     }
 
     function test_withdrawEth_revertsForNonCreator() public {
