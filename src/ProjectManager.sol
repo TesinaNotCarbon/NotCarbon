@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./Project.sol";
-import "./CarbonCreditToken.sol";
-import "./interfaces/IRoleManager.sol";
-import "./interfaces/ICompanyManager.sol";
-import "./interfaces/IProjectManager.sol";
-import "./interfaces/IProject.sol";
+import {Project} from "./Project.sol";
+import {CarbonCreditToken} from "./CarbonCreditToken.sol";
+import {IRoleManager} from "./interfaces/IRoleManager.sol";
+import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
+import {IProjectManager} from "./interfaces/IProjectManager.sol";
+import {IProject} from "./interfaces/IProject.sol";
 
 contract ProjectManager is IProjectManager {
     address public admin;

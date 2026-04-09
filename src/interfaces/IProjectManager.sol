@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./IProject.sol";
+import {IProject} from "./IProject.sol";
 
 interface IProjectManager {
     function registerProject(

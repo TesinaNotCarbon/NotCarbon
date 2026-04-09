@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./interfaces/IRoleManager.sol";
-import "./interfaces/ICompanyManager.sol";
-import "./Company.sol";
+import {IRoleManager} from "./interfaces/IRoleManager.sol";
+import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
+import {Company} from "./Company.sol";
 contract CompanyManager is ICompanyManager {
 
     mapping(address => bool) public registeredCompanies;

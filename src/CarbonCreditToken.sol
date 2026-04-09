@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./interfaces/IRoleManager.sol";
-import "./interfaces/ICarbonCreditToken.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IRoleManager} from "./interfaces/IRoleManager.sol";
+import {ICarbonCreditToken} from "./interfaces/ICarbonCreditToken.sol";
 
 contract CarbonCreditToken is ERC20, ICarbonCreditToken {
     address public admin;

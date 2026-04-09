@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./interfaces/IRoleManager.sol";
+import {IRoleManager} from "./interfaces/IRoleManager.sol";
 
 contract RoleManager is IRoleManager {
     address public override admin;

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./interfaces/IProjectManager.sol";
-import "./interfaces/ICompanyManager.sol";
-import "./interfaces/IProject.sol";
-import "./interfaces/ICarbonCreditMarket.sol";
+import {IProjectManager} from "./interfaces/IProjectManager.sol";
+import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
+import {IProject} from "./interfaces/IProject.sol";
+import {ICarbonCreditMarket} from "./interfaces/ICarbonCreditMarket.sol";
 
 contract CarbonCreditMarket is ICarbonCreditMarket {
     IProjectManager public override projectManager;
