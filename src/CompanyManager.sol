@@ -2,8 +2,9 @@
 pragma solidity ^0.8.19;
 
 import "./interfaces/IRoleManager.sol";
+import "./interfaces/ICompanyManager.sol";
 import "./Company.sol";
-contract CompanyManager {
+contract CompanyManager is ICompanyManager {
 
     mapping(address => bool) public registeredCompanies;
     address[] public companyList;
@@ -21,7 +22,7 @@ contract CompanyManager {
         roleManager = IRoleManager(_roleManagerAddress);
     }
 
-    function createCompany(string memory _name, uint256 _monthlyEmissions) public returns (address) {
+    function createCompany(string memory _name, uint256 _monthlyEmissions) public override returns (address) {
         Company company = new Company(msg.sender, _name, _monthlyEmissions, address(this));
         address contractAddr = address(company);
 
@@ -32,19 +33,19 @@ contract CompanyManager {
         return contractAddr;
     }
 
-    function approveCompany(address payable _companyAddress) public onlyApprover {
+    function approveCompany(address payable _companyAddress) public override onlyApprover {
         require(registeredCompanies[_companyAddress], "Empresa no registrada");
         Company company = Company(_companyAddress);
         company.approve();
         emit CompanyApproved(_companyAddress);
     }
 
-    function isApproved(address payable _companyAddress) external view returns (bool) {
+    function isApproved(address payable _companyAddress) external view override returns (bool) {
         Company company = Company(_companyAddress);
         return company.isApproved();
     }
 
-    function getAllCompanies() public view returns (address[] memory) {
+    function getAllCompanies() public view override returns (address[] memory) {
         return companyList;
     }
 }

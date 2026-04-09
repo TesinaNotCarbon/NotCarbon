@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./ProjectManager.sol";
+import "./interfaces/IProjectManager.sol";
 import "./interfaces/ICompanyManager.sol";
 import "./interfaces/IProject.sol";
+import "./interfaces/ICarbonCreditMarket.sol";
 
-contract CarbonCreditMarket {
-    ProjectManager public projectManager;
-    ICompanyManager public companyManager;
+contract CarbonCreditMarket is ICarbonCreditMarket {
+    IProjectManager public override projectManager;
+    ICompanyManager public override companyManager;
 
     event BuyFromAnyStarted(address indexed buyer, uint256 totalAmount, uint256 msgValue);
     event ProjectChecked(address indexed project, uint256 available, uint256 pricePerToken);
@@ -15,11 +16,11 @@ contract CarbonCreditMarket {
     event BuyFromAnyCompleted(uint256 totalSpent, uint256 refunded);
 
     constructor(address _projectManager, address _companyManager) {
-        projectManager = ProjectManager(_projectManager);
+        projectManager = IProjectManager(_projectManager);
         companyManager = ICompanyManager(_companyManager);
     }
 
-    function buyFromAny(uint256 totalAmount, address payable buyer) public payable {
+    function buyFromAny(uint256 totalAmount, address payable buyer) external payable override {
         emit BuyFromAnyStarted(buyer, totalAmount, msg.value);
         
         require(companyManager.isApproved(buyer), "Company not approved");

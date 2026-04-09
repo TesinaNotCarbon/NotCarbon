@@ -2,9 +2,11 @@
 pragma solidity ^0.8.19;
 
 interface ICompanyManager {
-    function registerCompany(string memory _name, uint256 _monthlyEmissions) external;
+    function createCompany(string memory _name, uint256 _monthlyEmissions) external returns (address);
 
-    function approveCompany(address _company) external;
+    function approveCompany(address payable _companyAddress) external;
 
-    function isApproved(address _company) external view returns (bool);
+    function isApproved(address payable _companyAddress) external view returns (bool);
+
+    function getAllCompanies() external view returns (address[] memory);
 }

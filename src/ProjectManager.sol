@@ -5,7 +5,10 @@ import "./Project.sol";
 import "./CarbonCreditToken.sol";
 import "./interfaces/IRoleManager.sol";
 import "./interfaces/ICompanyManager.sol";
-contract ProjectManager {
+import "./interfaces/IProjectManager.sol";
+import "./interfaces/IProject.sol";
+
+contract ProjectManager is IProjectManager {
     address public admin;
     mapping(address => bool) public approvers;
     mapping(address => bool) public registeredProjects;
@@ -15,7 +18,7 @@ contract ProjectManager {
     ICompanyManager public companyManager;
 
     event ProjectRegistered(address indexed projectAddress, string name, string description, address creator);
-    event ProjectStateUpdated(address indexed projectAddress, Project.ProjectState newState);
+    event ProjectStateUpdated(address indexed projectAddress, IProject.ProjectState newState);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only the admin can execute this function.");
@@ -38,7 +41,7 @@ contract ProjectManager {
         string memory _description,
         address _carbonCreditTokenAddress,
         uint256 _totalTokens
-    ) public returns (address) {
+    ) public override returns (address) {
         Project newProject = new Project(
             _name,
             _description,
@@ -59,22 +62,22 @@ contract ProjectManager {
         return projectAddress;
     }
 
-    function updateProjectStatus(address _projectAddress, Project.ProjectState _newState) public onlyApprover {
+    function updateProjectStatus(address _projectAddress, IProject.ProjectState _newState) public override onlyApprover {
         require(registeredProjects[_projectAddress], "Project is not registered.");
         Project project = Project(_projectAddress);
         project.updateState(_newState);
         emit ProjectStateUpdated(_projectAddress, _newState);
     }
 
-    function isProjectRegistered(address _projectAddress) public view returns (bool) {
+    function isProjectRegistered(address _projectAddress) public view override returns (bool) {
         return registeredProjects[_projectAddress];
     }
 
-    function setPricePerToken(uint256 _price) public onlyApprover {
+    function setPricePerToken(uint256 _price) public override onlyApprover {
         pricePerToken = _price;
     }
 
-    function getAllProjects() public view returns (address[] memory) {
+    function getAllProjects() public view override returns (address[] memory) {
         return projectList;
     }
 }

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-contract RoleManager {
-    address public admin;
+import "./interfaces/IRoleManager.sol";
+
+contract RoleManager is IRoleManager {
+    address public override admin;
     mapping(address => bool) public staff;
 
     event StaffAdded(address indexed staffMember);
@@ -33,10 +35,11 @@ contract RoleManager {
         emit StaffRemoved(_staff);
     }
 
-    function isStaff(address _user) public view returns (bool) {
+    function isStaff(address _user) public view override returns (bool) {
         return staff[_user];
     }
-    function isStaffOrAdmin(address _user) public view returns (bool) {
+
+    function isStaffOrAdmin(address _user) public view override returns (bool) {
         return (_user == admin || staff[_user]);
     }
 }

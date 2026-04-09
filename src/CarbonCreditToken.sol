@@ -3,8 +3,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/IRoleManager.sol";
+import "./interfaces/ICarbonCreditToken.sol";
 
-contract CarbonCreditToken is ERC20 {
+contract CarbonCreditToken is ERC20, ICarbonCreditToken {
     address public admin;
     address public projectManager;
     IRoleManager public roleManager;
@@ -26,20 +27,45 @@ contract CarbonCreditToken is ERC20 {
         roleManager = IRoleManager(_roleManager);
     }
 
+    function transfer(address recipient, uint256 amount)
+        public
+        override(ERC20, ICarbonCreditToken)
+        returns (bool)
+    {
+        return super.transfer(recipient, amount);
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount)
+        public
+        override(ERC20, ICarbonCreditToken)
+        returns (bool)
+    {
+        return super.transferFrom(sender, recipient, amount);
+    }
+
+    function balanceOf(address account)
+        public
+        view
+        override(ERC20, ICarbonCreditToken)
+        returns (uint256)
+    {
+        return super.balanceOf(account);
+    }
+
     // Función para minar (crear) nuevos tokens y asignarlos al contrato
-    function mint(uint256 amount) public onlyApprover {
+    function mint(uint256 amount) public override onlyApprover {
         _mint(address(this), amount); 
         emit TokensMinted(address(this), amount);
     }
 
     // Función para transferir tokens desde el contrato a otra dirección
-    function transferTokens(address recipient, uint256 amount) public onlyProjectManager {
+    function transferTokens(address recipient, uint256 amount) public override onlyProjectManager {
         require(balanceOf(address(this)) >= amount, "Insufficient token balance in contract");
         _transfer(address(this), recipient, amount);
     }
 
     // Función para quemar (destruir) tokens
-    function burn(uint256 amount) public {
+    function burn(uint256 amount) public override {
         _burn(msg.sender, amount); // Quema tokens de la dirección que llama la función
     }
 }

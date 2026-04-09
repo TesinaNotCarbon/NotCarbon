@@ -4,7 +4,9 @@ pragma solidity ^0.8.19;
 import "./interfaces/ICompanyManager.sol";
 import "./interfaces/IProject.sol";
 import "./interfaces/ICarbonCreditMarket.sol";
-contract Company {
+import "./interfaces/ICompany.sol";
+
+contract Company is ICompany {
     address public owner;
     address public companyManager;
     string public name;
@@ -32,14 +34,14 @@ contract Company {
         _;
     }
 
-    function buyFromProject(address payable projectAddress, uint256 amount) external payable onlyOwner {
+    function buyFromProject(address payable projectAddress, uint256 amount) external payable override onlyOwner {
         IProject project = IProject(projectAddress);
         project.buyCarbonCredits{value: msg.value}(amount);
         carbonCredits += amount;
         emit CarbonCreditsPurchased(projectAddress, amount);
     }
 
-    function buyFromMarket(address market, uint256 amount) external payable onlyOwner {
+    function buyFromMarket(address market, uint256 amount) external payable override onlyOwner {
 
         ICarbonCreditMarket marketContract = ICarbonCreditMarket(market);
         marketContract.buyFromAny{value: msg.value}(amount, payable(address(this)));
@@ -48,11 +50,11 @@ contract Company {
         emit CarbonCreditsPurchased(market, amount);
     }
 
-    function approve() external onlyCompanyManager {
+    function approve() external override onlyCompanyManager {
         approved = true;
     }
 
-    function isApproved() external view returns (bool) {
+    function isApproved() external view override returns (bool) {
         return approved;
     }
 

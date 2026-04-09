@@ -12,7 +12,7 @@ interface IProject {
 
     function buyCarbonCredits(uint256 _amount) external payable;
     
-    function buyFor(address payable buyer, uint256 amount) external payable;
+    function buyFor(address buyer, uint256 amount) external payable;
     
     function getReleasedTokens() external view returns (uint256);
     

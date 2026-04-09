@@ -1,39 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
+import {IProject} from "./interfaces/IProject.sol";
+import {ICarbonCreditToken} from "./interfaces/ICarbonCreditToken.sol";
 
-interface ICarbonCreditToken {
-    function transfer(
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-}
-
-contract Project {
+contract Project is IProject {
     address public projectManager;
     address public creator;
-    string public projectName;
-    string public projectDescription;
+    string public override projectName;
+    string public override projectDescription;
 
-    enum ProjectState {
-        Phase0,
-        Phase1,
-        Phase2,
-        Phase3,
-        Phase4
-    }
-    ProjectState public currentState;
+    IProject.ProjectState public override currentState;
 
     address public carbonCreditTokenAddress;
     uint256 public totalTokens;
     uint256 public purchasedTokens;
-    uint256 public pricePerToken;
+    uint256 public override pricePerToken;
     ICompanyManager public companyManager;
     ICarbonCreditToken public token;
 
@@ -70,7 +52,7 @@ contract Project {
         projectManager = msg.sender;
         projectName = _name;
         projectDescription = _description;
-        currentState = ProjectState.Phase0;
+        currentState = IProject.ProjectState.Phase0;
         carbonCreditTokenAddress = _carbonCreditTokenAddress;
         token = ICarbonCreditToken(_carbonCreditTokenAddress);
         totalTokens = _totalTokens;
@@ -86,7 +68,7 @@ contract Project {
     }
 
     // Función para actualizar el estado del proyecto
-    function updateState(ProjectState _newState) external onlyProjectManager {
+    function updateState(IProject.ProjectState _newState) external onlyProjectManager {
         require(
             uint(_newState) > uint(currentState),
             "New state must be a higher phase."
@@ -107,23 +89,23 @@ contract Project {
         return address(this).balance;
     }
 
-    function getReleasedTokens() public view returns (uint256) {
-        if (currentState == ProjectState.Phase0) {
+    function getReleasedTokens() public view override returns (uint256) {
+        if (currentState == IProject.ProjectState.Phase0) {
             return 0;
-        } else if (currentState == ProjectState.Phase1) {
+        } else if (currentState == IProject.ProjectState.Phase1) {
             return (totalTokens * 10) / 100;
-        } else if (currentState == ProjectState.Phase2) {
+        } else if (currentState == IProject.ProjectState.Phase2) {
             return (totalTokens * 40) / 100;
-        } else if (currentState == ProjectState.Phase3) {
+        } else if (currentState == IProject.ProjectState.Phase3) {
             return (totalTokens * 60) / 100;
-        } else if (currentState == ProjectState.Phase4) {
+        } else if (currentState == IProject.ProjectState.Phase4) {
             return totalTokens;
         }
         return 0;
     }
 
     // Función para comprar tokens con ETH
-    function buyCarbonCredits(uint256 _amount) external payable {
+    function buyCarbonCredits(uint256 _amount) external payable override {
 
         // Verificar que el usuario haya enviado suficiente ETH
         uint256 totalCost = _amount * pricePerToken;
@@ -158,8 +140,8 @@ contract Project {
         emit ETHWithdrawn(creator, _amount);
     }
 
-    function buyFor(address buyer, uint256 amount) external payable {
-        require(companyManager.isApproved(buyer), "Company not approved");
+    function buyFor(address buyer, uint256 amount) external payable override {
+        require(companyManager.isApproved(payable(buyer)), "Company not approved");
         uint256 totalCost = amount * pricePerToken;
         require(msg.value >= totalCost, "Insufficient ETH");
 
@@ -174,7 +156,7 @@ contract Project {
         emit TokensPurchased(buyer, amount);
     }
 
-    function getAvailableTokens() public view returns (uint256) {
+    function getAvailableTokens() public view override returns (uint256) {
         return getReleasedTokens() - purchasedTokens;
     }
 }
