@@ -194,15 +194,6 @@ cast send <CONTRACT_ADDRESS> "addStaff(address)" <STAFF_ADDRESS> \
   --rpc-url "$RPC_URL"
 ```
 
-## Legacy Brownie Scripts
-
-Brownie scripts are still present for historical reference:
-
-1. script/deploy.py
-2. script/project.py
-
-Operationally, the recommended deployment path in this repository is Foundry using script/Deploy.s.sol.
-
 ## Current Sepolia References
 
 1. PROJECT_MANAGER_CONTRACT_ADDRESS=0x5f160a757743184F1A665179B55408f0107b8aD5
