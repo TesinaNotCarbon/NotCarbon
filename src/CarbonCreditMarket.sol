@@ -56,7 +56,8 @@ contract CarbonCreditMarket {
         uint256 refund = 0;
         if (msg.value > totalSpent) {
             refund = msg.value - totalSpent;
-            buyer.transfer(refund);
+            (bool ok, ) = buyer.call{value: refund}("");
+            require(ok, "Refund failed");
         }
         
         emit BuyFromAnyCompleted(totalSpent, refund);

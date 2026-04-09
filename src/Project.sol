@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "./interfaces/ICompanyManager.sol";
+import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
+
 interface ICarbonCreditToken {
     function transfer(
         address recipient,
@@ -152,7 +153,8 @@ contract Project {
     // Función para que el creator retire el ETH acumulado
     function withdrawETH(uint256 _amount) public onlyCreator {
         require(address(this).balance >= _amount, "Insufficient ETH balance");
-        payable(creator).transfer(_amount);
+        (bool ok, ) = payable(creator).call{value: _amount}("");
+        require(ok, "ETH transfer failed");
         emit ETHWithdrawn(creator, _amount);
     }
 
