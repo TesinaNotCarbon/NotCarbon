@@ -1,0 +1,35 @@
+# Foundry build artifacts and cache
+cache/
+out/
+
+# Foundry broadcasts and runs
+# Keep folder in repo but ignore local/dev chain outputs and dry-runs.
+!/broadcast/
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+!/broadcast/**/run-latest.json
+
+# Coverage and reports
+coverage/
+lcov.info
+
+# Logs
+*.log
+
+# Secrets and env files
+.env
+.env.*
+!.env.example
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Optional generated docs
+docs/
