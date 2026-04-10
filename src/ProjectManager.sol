@@ -10,7 +10,6 @@ import {IProject} from "./interfaces/IProject.sol";
 
 contract ProjectManager is IProjectManager {
     address public admin;
-    mapping(address => bool) public approvers;
     mapping(address => bool) public registeredProjects;
     address[] public projectList;
     uint256 pricePerToken;
