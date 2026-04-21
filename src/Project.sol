@@ -18,6 +18,7 @@ contract Project is IProject {
     uint256 public override pricePerToken;
     ICompanyManager public companyManager;
     ICarbonCreditToken public token;
+    string public cellId;
 
     event Deposit(address indexed from, uint256 amount);
     event StateChanged(ProjectState newState);
@@ -53,7 +54,8 @@ contract Project is IProject {
         uint256 _totalTokens,
         address _creator,
         uint256 _pricePerToken,
-        ICompanyManager _companyManager
+        ICompanyManager _companyManager,
+        string memory _cellId
     ) {
         projectManager = msg.sender;
         projectName = _name;
@@ -66,6 +68,7 @@ contract Project is IProject {
         creator = _creator;
         pricePerToken = _pricePerToken;
         companyManager = _companyManager;
+        cellId = _cellId;
     }
 
     // Función para actualizar el precio por token (solo el project manager puede llamarla)

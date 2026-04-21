@@ -8,7 +8,8 @@ interface IProjectManager {
         string memory _name,
         string memory _description,
         address _carbonCreditTokenAddress,
-        uint256 _totalTokens
+        uint256 _totalTokens,
+        string memory _cellId
     ) external returns (address);
 
     function updateProjectStatus(address _projectAddress, IProject.ProjectState _newState) external;

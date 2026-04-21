@@ -39,7 +39,8 @@ contract ProjectManager is IProjectManager {
         string memory _name,
         string memory _description,
         address _carbonCreditTokenAddress,
-        uint256 _totalTokens
+        uint256 _totalTokens,
+        string memory _cellId
     ) public override returns (address) {
         Project newProject = new Project(
             _name,
@@ -48,11 +49,12 @@ contract ProjectManager is IProjectManager {
             _totalTokens,
             msg.sender,
             pricePerToken,
-            companyManager
+            companyManager,
+            _cellId
         );
         address projectAddress = address(newProject);
         registeredProjects[projectAddress] = true;
-        projectList.push(projectAddress);
+        projectList.push(projectAddress);   
 
         CarbonCreditToken token = CarbonCreditToken(_carbonCreditTokenAddress);
         token.transferTokens(projectAddress, _totalTokens);
