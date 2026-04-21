@@ -65,7 +65,8 @@ abstract contract BaseTest is Test {
         uint256 totalTokens
     ) internal returns (Project) {
         vm.prank(projectCreator);
-        address projectAddress = projectManager.registerProject(name, description, address(token), totalTokens);
+        address projectAddress =
+            projectManager.registerProject(name, description, address(token), totalTokens, "CELL-001");
         return Project(payable(projectAddress));
     }
 

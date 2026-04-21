@@ -54,7 +54,7 @@ contract MockMarketProject is IProject {
             projects = _projects;
         }
 
-        function registerProject(string memory, string memory, address, uint256)
+        function registerProject(string memory, string memory, address, uint256, string memory)
             external
             pure
             override

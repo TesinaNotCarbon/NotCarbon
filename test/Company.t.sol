@@ -45,7 +45,12 @@ contract MockCompanyProject is IProject {
 }
 
 contract MockProjectManagerForCompany is IProjectManager {
-    function registerProject(string memory, string memory, address, uint256) external pure override returns (address) {
+    function registerProject(string memory, string memory, address, uint256, string memory)
+        external
+        pure
+        override
+        returns (address)
+    {
         return address(0);
     }
 
