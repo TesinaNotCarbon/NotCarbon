@@ -39,7 +39,8 @@ contract ProjectManager is IProjectManager {
         string memory _name,
         string memory _description,
         address _carbonCreditTokenAddress,
-        uint256 _totalTokens
+        uint256 _totalTokens,
+        string memory _cellId
     ) public override returns (address) {
         Project newProject = new Project(
             _name,
@@ -48,7 +49,8 @@ contract ProjectManager is IProjectManager {
             _totalTokens,
             msg.sender,
             pricePerToken,
-            companyManager
+            companyManager,
+            _cellId
         );
         address projectAddress = address(newProject);
         registeredProjects[projectAddress] = true;
@@ -61,7 +63,11 @@ contract ProjectManager is IProjectManager {
         return projectAddress;
     }
 
-    function updateProjectStatus(address _projectAddress, IProject.ProjectState _newState) public override onlyApprover {
+    function updateProjectStatus(address _projectAddress, IProject.ProjectState _newState)
+        public
+        override
+        onlyApprover
+    {
         require(registeredProjects[_projectAddress], "Project is not registered.");
         Project project = Project(_projectAddress);
         project.updateState(_newState);

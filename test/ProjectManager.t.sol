@@ -37,14 +37,14 @@ contract ProjectManagerTest is BaseTest {
 
         vm.prank(creator);
         vm.expectRevert("Insufficient token balance in contract");
-        projectManager.registerProject("Solar", "Solar farm", address(token), 1000);
+        projectManager.registerProject("Solar", "Solar farm", address(token), 1000, "CELL-001");
     }
 
     function test_registerProject_success() public {
         _bootstrapPriceAndMint(2 ether, 2000);
 
         vm.prank(creator);
-        address projectAddress = projectManager.registerProject("Solar", "Solar farm", address(token), 500);
+        address projectAddress = projectManager.registerProject("Solar", "Solar farm", address(token), 500, "CELL-001");
 
         assertTrue(projectManager.isProjectRegistered(projectAddress));
 

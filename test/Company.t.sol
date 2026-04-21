@@ -18,22 +18,49 @@ contract MockCompanyProject is IProject {
     }
 
     function buyFor(address, uint256) external payable override {}
-    function getReleasedTokens() external pure override returns (uint256) { return 0; }
-    function pricePerToken() external pure override returns (uint256) { return 0; }
-    function currentState() external pure override returns (ProjectState) { return ProjectState.Phase0; }
-    function projectName() external pure override returns (string memory) { return ""; }
-    function projectDescription() external pure override returns (string memory) { return ""; }
-    function getAvailableTokens() external pure override returns (uint256) { return 0; }
+
+    function getReleasedTokens() external pure override returns (uint256) {
+        return 0;
+    }
+
+    function pricePerToken() external pure override returns (uint256) {
+        return 0;
+    }
+
+    function currentState() external pure override returns (ProjectState) {
+        return ProjectState.Phase0;
+    }
+
+    function projectName() external pure override returns (string memory) {
+        return "";
+    }
+
+    function projectDescription() external pure override returns (string memory) {
+        return "";
+    }
+
+    function getAvailableTokens() external pure override returns (uint256) {
+        return 0;
+    }
 }
 
 contract MockProjectManagerForCompany is IProjectManager {
-    function registerProject(string memory, string memory, address, uint256) external pure override returns (address) {
+    function registerProject(string memory, string memory, address, uint256, string memory)
+        external
+        pure
+        override
+        returns (address)
+    {
         return address(0);
     }
 
     function updateProjectStatus(address, IProject.ProjectState) external pure override {}
-    function isProjectRegistered(address) external pure override returns (bool) { return false; }
+
+    function isProjectRegistered(address) external pure override returns (bool) {
+        return false;
+    }
     function setPricePerToken(uint256) external pure override {}
+
     function getAllProjects() external pure override returns (address[] memory) {
         address[] memory p = new address[](0);
         return p;
@@ -46,7 +73,11 @@ contract MockCompanyManagerForCompany is ICompanyManager {
     }
 
     function approveCompany(address payable) external pure override {}
-    function isApproved(address payable) external pure override returns (bool) { return true; }
+
+    function isApproved(address payable) external pure override returns (bool) {
+        return true;
+    }
+
     function getAllCompanies() external pure override returns (address[] memory) {
         address[] memory c = new address[](0);
         return c;
@@ -161,7 +192,7 @@ contract CompanyTest is Test {
 
     function test_receive_acceptsEth() public {
         vm.prank(payer);
-        (bool ok, ) = address(company).call{value: 1 ether}("");
+        (bool ok,) = address(company).call{value: 1 ether}("");
         assertTrue(ok);
         assertEq(address(company).balance, 1 ether);
     }

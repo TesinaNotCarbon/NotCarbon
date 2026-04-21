@@ -18,6 +18,7 @@ contract Project is IProject {
     uint256 public override pricePerToken;
     ICompanyManager public companyManager;
     ICarbonCreditToken public token;
+    string public cellId;
 
     event Deposit(address indexed from, uint256 amount);
     event StateChanged(ProjectState newState);
@@ -26,23 +27,17 @@ contract Project is IProject {
 
     function _refund(address payable to, uint256 amount) internal {
         if (amount == 0) return;
-        (bool ok, ) = to.call{value: amount}("");
+        (bool ok,) = to.call{value: amount}("");
         require(ok, "Refund failed");
     }
 
     modifier onlyProjectManager() {
-        require(
-            msg.sender == projectManager,
-            "Only the project manager can execute this function."
-        );
+        require(msg.sender == projectManager, "Only the project manager can execute this function.");
         _;
     }
 
     modifier onlyCreator() {
-        require(
-            msg.sender == creator,
-            "Only the project creator can execute this function."
-        );
+        require(msg.sender == creator, "Only the project creator can execute this function.");
         _;
     }
 
@@ -53,7 +48,8 @@ contract Project is IProject {
         uint256 _totalTokens,
         address _creator,
         uint256 _pricePerToken,
-        ICompanyManager _companyManager
+        ICompanyManager _companyManager,
+        string memory _cellId
     ) {
         projectManager = msg.sender;
         projectName = _name;
@@ -66,6 +62,7 @@ contract Project is IProject {
         creator = _creator;
         pricePerToken = _pricePerToken;
         companyManager = _companyManager;
+        cellId = _cellId;
     }
 
     // Función para actualizar el precio por token (solo el project manager puede llamarla)
@@ -75,10 +72,7 @@ contract Project is IProject {
 
     // Función para actualizar el estado del proyecto
     function updateState(IProject.ProjectState _newState) external onlyProjectManager {
-        require(
-            uint(_newState) > uint(currentState),
-            "New state must be a higher phase."
-        );
+        require(uint256(_newState) > uint256(currentState), "New state must be a higher phase.");
         currentState = _newState;
         emit StateChanged(_newState);
     }
@@ -112,22 +106,15 @@ contract Project is IProject {
 
     // Función para comprar tokens con ETH
     function buyCarbonCredits(uint256 _amount) external payable override {
-
         // Verificar que el usuario haya enviado suficiente ETH
         uint256 totalCost = _amount * pricePerToken;
         require(msg.value >= totalCost, "Insufficient ETH sent");
 
         // Verificar que hay suficientes tokens liberados
-        require(
-            _amount <= getAvailableTokens(),
-            "Amount exceeds available tokens for this phase"
-        );
+        require(_amount <= getAvailableTokens(), "Amount exceeds available tokens for this phase");
 
         // Verificar que el contrato tiene suficientes tokens
-        require(
-            token.balanceOf(address(this)) >= _amount,
-            "Insufficient token balance"
-        );
+        require(token.balanceOf(address(this)) >= _amount, "Insufficient token balance");
 
         // Transferir tokens al usuario
         require(token.transfer(msg.sender, _amount), "Token transfer failed");
@@ -143,7 +130,7 @@ contract Project is IProject {
     // Función para que el creator retire el ETH acumulado
     function withdrawETH(uint256 _amount) public onlyCreator {
         require(address(this).balance >= _amount, "Insufficient ETH balance");
-        (bool ok, ) = payable(creator).call{value: _amount}("");
+        (bool ok,) = payable(creator).call{value: _amount}("");
         require(ok, "ETH transfer failed");
         emit ETHWithdrawn(creator, _amount);
     }
@@ -153,10 +140,7 @@ contract Project is IProject {
         uint256 totalCost = amount * pricePerToken;
         require(msg.value >= totalCost, "Insufficient ETH");
 
-        require(
-            getReleasedTokens() - purchasedTokens >= amount,
-            "Not enough tokens released"
-        );
+        require(getReleasedTokens() - purchasedTokens >= amount, "Not enough tokens released");
         require(token.balanceOf(address(this)) >= amount, "Insufficient balance");
 
         require(token.transfer(buyer, amount), "Transfer failed");

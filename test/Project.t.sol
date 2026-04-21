@@ -27,7 +27,9 @@ contract ProjectTest is Test {
         roleManager = new RoleManager();
         companyManager = new CompanyManager(address(roleManager));
         token = new CarbonCreditToken(address(this), address(roleManager));
-        project = new Project("Forest", "Restore native forest", address(token), 1000, creator, 1 ether, companyManager);
+        project = new Project(
+            "Forest", "Restore native forest", address(token), 1000, creator, 1 ether, companyManager, "CELL-001"
+        );
 
         token.mint(1000);
         token.transferTokens(address(project), 1000);

@@ -22,7 +22,7 @@ contract CarbonCreditMarket is ICarbonCreditMarket {
 
     function buyFromAny(uint256 totalAmount, address payable buyer) external payable override {
         emit BuyFromAnyStarted(buyer, totalAmount, msg.value);
-        
+
         require(companyManager.isApproved(buyer), "Company not approved");
 
         uint256 remaining = totalAmount;
@@ -30,7 +30,7 @@ contract CarbonCreditMarket is ICarbonCreditMarket {
 
         address[] memory projects = projectManager.getAllProjects();
 
-        for (uint i = 0; i < projects.length && remaining > 0; i++) {
+        for (uint256 i = 0; i < projects.length && remaining > 0; i++) {
             IProject p = IProject(projects[i]);
 
             uint256 available = p.getAvailableTokens();
@@ -50,17 +50,17 @@ contract CarbonCreditMarket is ICarbonCreditMarket {
                 totalSpent += cost;
             }
         }
-        
+
         require(remaining == 0, "Could not complete purchase with available projects");
 
         // Devolver ETH sobrante
         uint256 refund = 0;
         if (msg.value > totalSpent) {
             refund = msg.value - totalSpent;
-            (bool ok, ) = buyer.call{value: refund}("");
+            (bool ok,) = buyer.call{value: refund}("");
             require(ok, "Refund failed");
         }
-        
+
         emit BuyFromAnyCompleted(totalSpent, refund);
     }
 }
