@@ -4,8 +4,8 @@ pragma solidity ^0.8.19;
 import {IRoleManager} from "./interfaces/IRoleManager.sol";
 import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
 import {Company} from "./Company.sol";
-contract CompanyManager is ICompanyManager {
 
+contract CompanyManager is ICompanyManager {
     mapping(address => bool) public registeredCompanies;
     address[] public companyList;
     IRoleManager public roleManager;

@@ -54,7 +54,7 @@ contract ProjectManager is IProjectManager {
         );
         address projectAddress = address(newProject);
         registeredProjects[projectAddress] = true;
-        projectList.push(projectAddress);   
+        projectList.push(projectAddress);
 
         CarbonCreditToken token = CarbonCreditToken(_carbonCreditTokenAddress);
         token.transferTokens(projectAddress, _totalTokens);
@@ -63,7 +63,11 @@ contract ProjectManager is IProjectManager {
         return projectAddress;
     }
 
-    function updateProjectStatus(address _projectAddress, IProject.ProjectState _newState) public override onlyApprover {
+    function updateProjectStatus(address _projectAddress, IProject.ProjectState _newState)
+        public
+        override
+        onlyApprover
+    {
         require(registeredProjects[_projectAddress], "Project is not registered.");
         Project project = Project(_projectAddress);
         project.updateState(_newState);

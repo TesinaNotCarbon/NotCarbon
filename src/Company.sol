@@ -42,7 +42,6 @@ contract Company is ICompany {
     }
 
     function buyFromMarket(address market, uint256 amount) external payable override onlyOwner {
-
         ICarbonCreditMarket marketContract = ICarbonCreditMarket(market);
         marketContract.buyFromAny{value: msg.value}(amount, payable(address(this)));
 

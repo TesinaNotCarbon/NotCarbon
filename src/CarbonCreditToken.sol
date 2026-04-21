@@ -11,7 +11,7 @@ contract CarbonCreditToken is ERC20, ICarbonCreditToken {
     IRoleManager public roleManager;
     // Evento para registrar la creación de nuevos tokens
     event TokensMinted(address indexed to, uint256 amount);
-    
+
     modifier onlyProjectManager() {
         require(msg.sender == projectManager, "Only the project manager can execute this function.");
         _;
@@ -21,17 +21,14 @@ contract CarbonCreditToken is ERC20, ICarbonCreditToken {
         require(roleManager.isStaffOrAdmin(msg.sender), "Only staff or admin can execute this function.");
         _;
     }
+
     constructor(address _projectManager, address _roleManager) ERC20("CarbonCreditToken", "CCT") {
-        admin = msg.sender; 
+        admin = msg.sender;
         projectManager = _projectManager;
         roleManager = IRoleManager(_roleManager);
     }
 
-    function transfer(address recipient, uint256 amount)
-        public
-        override(ERC20, ICarbonCreditToken)
-        returns (bool)
-    {
+    function transfer(address recipient, uint256 amount) public override(ERC20, ICarbonCreditToken) returns (bool) {
         return super.transfer(recipient, amount);
     }
 
@@ -43,18 +40,13 @@ contract CarbonCreditToken is ERC20, ICarbonCreditToken {
         return super.transferFrom(sender, recipient, amount);
     }
 
-    function balanceOf(address account)
-        public
-        view
-        override(ERC20, ICarbonCreditToken)
-        returns (uint256)
-    {
+    function balanceOf(address account) public view override(ERC20, ICarbonCreditToken) returns (uint256) {
         return super.balanceOf(account);
     }
 
     // Función para minar (crear) nuevos tokens y asignarlos al contrato
     function mint(uint256 amount) public override onlyApprover {
-        _mint(address(this), amount); 
+        _mint(address(this), amount);
         emit TokensMinted(address(this), amount);
     }
 

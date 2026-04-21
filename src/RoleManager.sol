@@ -21,13 +21,13 @@ contract RoleManager is IRoleManager {
     }
 
     constructor() {
-        admin = msg.sender; 
+        admin = msg.sender;
     }
 
-    function addStaff(address _staff) public onlyAdmin{
-    require(!staff[_staff], "Este usuario ya es staff"); 
-    staff[_staff] = true; 
-    emit StaffAdded(_staff); 
+    function addStaff(address _staff) public onlyAdmin {
+        require(!staff[_staff], "Este usuario ya es staff");
+        staff[_staff] = true;
+        emit StaffAdded(_staff);
     }
 
     function removeStaff(address _staff) public onlyAdmin {
