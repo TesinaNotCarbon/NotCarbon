@@ -64,9 +64,18 @@ abstract contract BaseTest is Test {
         string memory description,
         uint256 totalTokens
     ) internal returns (Project) {
+        return _registerProject(projectCreator, name, description, totalTokens, "CELL-001");
+    }
+
+    function _registerProject(
+        address projectCreator,
+        string memory name,
+        string memory description,
+        uint256 totalTokens,
+        string memory cellId
+    ) internal returns (Project) {
         vm.prank(projectCreator);
-        address projectAddress =
-            projectManager.registerProject(name, description, address(token), totalTokens, "CELL-001");
+        address projectAddress = projectManager.registerProject(name, description, address(token), totalTokens, cellId);
         return Project(payable(projectAddress));
     }
 

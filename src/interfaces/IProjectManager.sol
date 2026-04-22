@@ -19,4 +19,8 @@ interface IProjectManager {
     function setPricePerToken(uint256 _price) external;
 
     function getAllProjects() external view returns (address[] memory);
+
+    function isApprovedCellId(string memory _cellId) external view returns (bool);
+
+    function getApprovedCellIds() external view returns (string[] memory);
 }

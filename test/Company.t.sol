@@ -31,11 +31,17 @@ contract MockCompanyProject is IProject {
         return ProjectState.Phase0;
     }
 
+    function updateState(ProjectState) external pure override {}
+
     function projectName() external pure override returns (string memory) {
         return "";
     }
 
     function projectDescription() external pure override returns (string memory) {
+        return "";
+    }
+
+    function cellId() external pure override returns (string memory) {
         return "";
     }
 
@@ -64,6 +70,15 @@ contract MockProjectManagerForCompany is IProjectManager {
     function getAllProjects() external pure override returns (address[] memory) {
         address[] memory p = new address[](0);
         return p;
+    }
+
+    function isApprovedCellId(string memory) external pure override returns (bool) {
+        return false;
+    }
+
+    function getApprovedCellIds() external pure override returns (string[] memory) {
+        string[] memory c = new string[](0);
+        return c;
     }
 }
 

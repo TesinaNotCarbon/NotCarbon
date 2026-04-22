@@ -20,9 +20,13 @@ interface IProject {
 
     function currentState() external view returns (ProjectState);
 
+    function updateState(ProjectState _newState) external;
+
     function projectName() external view returns (string memory);
 
     function projectDescription() external view returns (string memory);
+
+    function cellId() external view returns (string memory);
 
     function getAvailableTokens() external view returns (uint256);
 }
