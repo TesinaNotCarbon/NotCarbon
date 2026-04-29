@@ -34,12 +34,18 @@ contract MockMarketProject is IProject {
         return ProjectState.Phase4;
     }
 
+    function updateState(ProjectState) external pure override {}
+
     function projectName() external pure override returns (string memory) {
         return "mock";
     }
 
     function projectDescription() external pure override returns (string memory) {
         return "mock";
+    }
+
+    function cellId() external pure override returns (string memory) {
+        return "mock-cell";
     }
 
     function getAvailableTokens() external view override returns (uint256) {
@@ -73,6 +79,15 @@ contract MockMarketProject is IProject {
 
         function getAllProjects() external view override returns (address[] memory) {
             return projects;
+        }
+
+        function isApprovedCellId(string memory) external pure override returns (bool) {
+            return false;
+        }
+
+        function getApprovedCellIds() external pure override returns (string[] memory) {
+            string[] memory c = new string[](0);
+            return c;
         }
     }
 

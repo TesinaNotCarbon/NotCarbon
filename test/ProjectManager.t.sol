@@ -9,6 +9,7 @@ import {BaseTest} from "./Base.t.sol";
 contract ProjectManagerTest is BaseTest {
     event ProjectRegistered(address indexed projectAddress, string name, string description, address creator);
     event ProjectStateUpdated(address indexed projectAddress, IProject.ProjectState newState);
+    event ApprovedCellIdRecorded(address indexed projectAddress, string cellId);
 
     function setUp() public {
         _deployCore();
@@ -81,5 +82,44 @@ contract ProjectManagerTest is BaseTest {
         projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase1);
 
         assertEq(uint256(project.currentState()), uint256(IProject.ProjectState.Phase1));
+    }
+
+    function test_registerProject_revertsWhenCellIdAlreadyUsed() public {
+        _bootstrapPriceAndMint(1 ether, 2000);
+
+        vm.prank(creator);
+        projectManager.registerProject("Solar", "Solar farm", address(token), 500, "CELL-001");
+
+        vm.prank(creator);
+        vm.expectRevert("Cell ID already used.");
+        projectManager.registerProject("Wind", "Wind farm", address(token), 500, "CELL-001");
+    }
+
+    function test_updateProjectStatus_recordsApprovedCellIdOnPhase1() public {
+        _bootstrapPriceAndMint(1 ether, 1000);
+        Project project = _registerProject(creator, "Solar", "Solar farm", 200);
+
+        vm.expectEmit(true, false, false, true);
+        emit ApprovedCellIdRecorded(address(project), "CELL-001");
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase1);
+
+        assertTrue(projectManager.isApprovedCellId("CELL-001"));
+        string[] memory approved = projectManager.getApprovedCellIds();
+        assertEq(approved.length, 1);
+        assertEq(approved[0], "CELL-001");
+    }
+
+    function test_updateProjectStatus_doesNotDuplicateApprovedCellIdAcrossPhases() public {
+        _bootstrapPriceAndMint(1 ether, 1000);
+        Project project = _registerProject(creator, "Solar", "Solar farm", 200);
+
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase1);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase2);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase3);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase4);
+
+        string[] memory approved = projectManager.getApprovedCellIds();
+        assertEq(approved.length, 1);
+        assertEq(approved[0], "CELL-001");
     }
 }

@@ -18,7 +18,7 @@ contract Project is IProject {
     uint256 public override pricePerToken;
     ICompanyManager public companyManager;
     ICarbonCreditToken public token;
-    string public cellId;
+    string public override cellId;
 
     event Deposit(address indexed from, uint256 amount);
     event StateChanged(ProjectState newState);

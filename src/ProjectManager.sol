@@ -11,13 +11,18 @@ import {IProject} from "./interfaces/IProject.sol";
 contract ProjectManager is IProjectManager {
     address public admin;
     mapping(address => bool) public registeredProjects;
+    mapping(bytes32 => bool) public usedCellIds;
+    mapping(bytes32 => bool) public approvedCellIds;
+    mapping(address => bool) public projectApprovalRecorded;
     address[] public projectList;
+    string[] public approvedCellIdList;
     uint256 pricePerToken;
     IRoleManager public roleManager;
     ICompanyManager public companyManager;
 
     event ProjectRegistered(address indexed projectAddress, string name, string description, address creator);
     event ProjectStateUpdated(address indexed projectAddress, IProject.ProjectState newState);
+    event ApprovedCellIdRecorded(address indexed projectAddress, string cellId);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only the admin can execute this function.");
@@ -42,6 +47,9 @@ contract ProjectManager is IProjectManager {
         uint256 _totalTokens,
         string memory _cellId
     ) public override returns (address) {
+        bytes32 cellIdHash = keccak256(bytes(_cellId));
+        require(!usedCellIds[cellIdHash], "Cell ID already used.");
+
         Project newProject = new Project(
             _name,
             _description,
@@ -54,6 +62,7 @@ contract ProjectManager is IProjectManager {
         );
         address projectAddress = address(newProject);
         registeredProjects[projectAddress] = true;
+        usedCellIds[cellIdHash] = true;
         projectList.push(projectAddress);
 
         CarbonCreditToken token = CarbonCreditToken(_carbonCreditTokenAddress);
@@ -69,8 +78,18 @@ contract ProjectManager is IProjectManager {
         onlyApprover
     {
         require(registeredProjects[_projectAddress], "Project is not registered.");
-        Project project = Project(_projectAddress);
+        IProject project = IProject(_projectAddress);
         project.updateState(_newState);
+
+        if (_newState >= IProject.ProjectState.Phase1 && !projectApprovalRecorded[_projectAddress]) {
+            string memory projectCellId = project.cellId();
+            bytes32 cellIdHash = keccak256(bytes(projectCellId));
+            approvedCellIds[cellIdHash] = true;
+            projectApprovalRecorded[_projectAddress] = true;
+            approvedCellIdList.push(projectCellId);
+            emit ApprovedCellIdRecorded(_projectAddress, projectCellId);
+        }
+
         emit ProjectStateUpdated(_projectAddress, _newState);
     }
 
@@ -84,5 +103,13 @@ contract ProjectManager is IProjectManager {
 
     function getAllProjects() public view override returns (address[] memory) {
         return projectList;
+    }
+
+    function isApprovedCellId(string memory _cellId) public view override returns (bool) {
+        return approvedCellIds[keccak256(bytes(_cellId))];
+    }
+
+    function getApprovedCellIds() public view override returns (string[] memory) {
+        return approvedCellIdList;
     }
 }
