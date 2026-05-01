@@ -7,11 +7,11 @@ import {IRoleManager} from "./interfaces/IRoleManager.sol";
 import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
 import {IProjectManager} from "./interfaces/IProjectManager.sol";
 import {IProject} from "./interfaces/IProject.sol";
-import {ChainlinkClient} from "../lib/chainlink-brownie-contracts/contracts/src/v0.8/ChainlinkClient.sol";
-import {Chainlink} from "../lib/chainlink-brownie-contracts/contracts/src/v0.8/Chainlink.sol";
+import {ChainlinkClient} from "chainlink-brownie-contracts/contracts/src/v0.8/ChainlinkClient.sol";
+import {Chainlink} from "chainlink-brownie-contracts/contracts/src/v0.8/Chainlink.sol";
 import {
     LinkTokenInterface
-} from "../lib/chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
+} from "chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 
 contract ProjectManager is IProjectManager, ChainlinkClient {
     using Chainlink for Chainlink.Request;
