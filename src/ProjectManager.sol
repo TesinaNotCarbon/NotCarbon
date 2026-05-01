@@ -165,7 +165,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         require(validationOracle != address(0), "Chainlink config not set.");
 
         Chainlink.Request memory req = _buildOperatorRequest(validationJobId, this.fulfillValidation.selector);
-        req.add("cell_id", project.cellId());
+        req._add("cell_id", project.cellId());
 
         bytes32 requestId = _sendOperatorRequest(req, validationFee);
         validationRequests[requestId] = _projectAddress;
