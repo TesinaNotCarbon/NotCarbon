@@ -77,9 +77,9 @@ contract ProjectManagerTest is BaseTest {
         _bootstrapPriceAndMint(1 ether, 1000);
         Project project = _registerProject(creator, "Solar", "Solar farm", 200);
 
+        projectManager.mockValidationResult(address(project), false, false);
         vm.expectEmit(true, false, false, true);
         emit ProjectStateUpdated(address(project), IProject.ProjectState.Approved);
-        projectManager.mockValidationResult(address(project), false, false);
         projectManager.updateProjectStatus(address(project), IProject.ProjectState.Approved);
 
         assertEq(uint256(project.currentState()), uint256(IProject.ProjectState.Approved));
@@ -100,9 +100,9 @@ contract ProjectManagerTest is BaseTest {
         _bootstrapPriceAndMint(1 ether, 1000);
         Project project = _registerProject(creator, "Solar", "Solar farm", 200);
 
+        projectManager.mockValidationResult(address(project), false, false);
         vm.expectEmit(true, false, false, true);
         emit ApprovedCellIdRecorded(address(project), "CELL-001");
-        projectManager.mockValidationResult(address(project), false, false);
         projectManager.updateProjectStatus(address(project), IProject.ProjectState.Approved);
 
         assertTrue(projectManager.isApprovedCellId("CELL-001"));
