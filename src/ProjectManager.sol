@@ -9,7 +9,9 @@ import {IProjectManager} from "./interfaces/IProjectManager.sol";
 import {IProject} from "./interfaces/IProject.sol";
 import {ChainlinkClient} from "chainlink-brownie-contracts/contracts/src/v0.8/ChainlinkClient.sol";
 import {Chainlink} from "chainlink-brownie-contracts/contracts/src/v0.8/Chainlink.sol";
-import {LinkTokenInterface} from "chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
+import {
+    LinkTokenInterface
+} from "chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 
 contract ProjectManager is IProjectManager, ChainlinkClient {
     using Chainlink for Chainlink.Request;
@@ -46,11 +48,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
     event ApprovedCellIdRecorded(address indexed projectAddress, string cellId);
     event ProjectValidationRequested(address indexed projectAddress, bytes32 requestId, string cellId);
     event ProjectValidationCompleted(
-        address indexed projectAddress,
-        bytes32 requestId,
-        bool validated,
-        bool overlap,
-        bool inconclusive
+        address indexed projectAddress, bytes32 requestId, bool validated, bool overlap, bool inconclusive
     );
 
     modifier onlyAdmin() {
@@ -166,10 +164,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         require(!validationPending[_projectAddress], "Validation already pending.");
         require(validationOracle != address(0), "Chainlink config not set.");
 
-        Chainlink.Request memory req = _buildOperatorRequest(
-            validationJobId,
-            this.fulfillValidation.selector
-        );
+        Chainlink.Request memory req = _buildOperatorRequest(validationJobId, this.fulfillValidation.selector);
         req.add("cell_id", project.cellId());
 
         bytes32 requestId = _sendOperatorRequest(req, validationFee);
@@ -229,10 +224,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
     {
         bool isValidated = !_overlap && !_inconclusive;
         validationStatus[_projectAddress] = ValidationStatus({
-            validated: isValidated,
-            overlap: _overlap,
-            inconclusive: _inconclusive,
-            updatedAt: block.timestamp
+            validated: isValidated, overlap: _overlap, inconclusive: _inconclusive, updatedAt: block.timestamp
         });
         validationPending[_projectAddress] = false;
 
