@@ -28,7 +28,7 @@ contract MockCompanyProject is IProject {
     }
 
     function currentState() external pure override returns (ProjectState) {
-        return ProjectState.Phase0;
+        return ProjectState.Registered;
     }
 
     function updateState(ProjectState) external pure override {}
@@ -62,10 +62,25 @@ contract MockProjectManagerForCompany is IProjectManager {
 
     function updateProjectStatus(address, IProject.ProjectState) external pure override {}
 
+    function requestProjectValidation(address) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function getValidationStatus(address)
+        external
+        pure
+        override
+        returns (bool validated, bool overlap, bool inconclusive, uint256 updatedAt)
+    {
+        return (false, false, false, 0);
+    }
+
     function isProjectRegistered(address) external pure override returns (bool) {
         return false;
     }
     function setPricePerToken(uint256) external pure override {}
+
+    function setChainlinkConfig(address, address, bytes32, uint256) external pure override {}
 
     function getAllProjects() external pure override returns (address[] memory) {
         address[] memory p = new address[](0);

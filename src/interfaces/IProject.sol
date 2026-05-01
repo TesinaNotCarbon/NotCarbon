@@ -3,8 +3,9 @@ pragma solidity ^0.8.19;
 
 interface IProject {
     enum ProjectState {
-        Phase0,
-        Phase1,
+        Registered,
+        Validated,
+        Approved,
         Phase2,
         Phase3,
         Phase4

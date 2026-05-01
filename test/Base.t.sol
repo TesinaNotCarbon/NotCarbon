@@ -80,7 +80,8 @@ abstract contract BaseTest is Test {
     }
 
     function _advanceToPhase4(address projectAddress) internal {
-        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase1);
+        projectManager.mockValidationResult(projectAddress, false, false);
+        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Approved);
         projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase2);
         projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase3);
         projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase4);

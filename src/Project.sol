@@ -54,7 +54,7 @@ contract Project is IProject {
         projectManager = msg.sender;
         projectName = _name;
         projectDescription = _description;
-        currentState = IProject.ProjectState.Phase0;
+        currentState = IProject.ProjectState.Registered;
         carbonCreditTokenAddress = _carbonCreditTokenAddress;
         token = ICarbonCreditToken(_carbonCreditTokenAddress);
         totalTokens = _totalTokens;
@@ -90,9 +90,11 @@ contract Project is IProject {
     }
 
     function getReleasedTokens() public view override returns (uint256) {
-        if (currentState == IProject.ProjectState.Phase0) {
+        if (currentState == IProject.ProjectState.Registered) {
             return 0;
-        } else if (currentState == IProject.ProjectState.Phase1) {
+        } else if (currentState == IProject.ProjectState.Validated) {
+            return 0;
+        } else if (currentState == IProject.ProjectState.Approved) {
             return (totalTokens * 10) / 100;
         } else if (currentState == IProject.ProjectState.Phase2) {
             return (totalTokens * 40) / 100;

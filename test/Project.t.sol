@@ -44,7 +44,7 @@ contract ProjectTest is Test {
         assertEq(project.projectManager(), address(this));
         assertEq(project.projectName(), "Forest");
         assertEq(project.projectDescription(), "Restore native forest");
-        assertEq(uint256(project.currentState()), uint256(IProject.ProjectState.Phase0));
+        assertEq(uint256(project.currentState()), uint256(IProject.ProjectState.Registered));
         assertEq(project.totalTokens(), 1000);
         assertEq(project.purchasedTokens(), 0);
         assertEq(project.pricePerToken(), 1 ether);
@@ -57,16 +57,19 @@ contract ProjectTest is Test {
     }
 
     function test_updateState_mustIncrease() public {
-        project.updateState(IProject.ProjectState.Phase1);
+        project.updateState(IProject.ProjectState.Approved);
 
         vm.expectRevert("New state must be a higher phase.");
-        project.updateState(IProject.ProjectState.Phase1);
+        project.updateState(IProject.ProjectState.Approved);
     }
 
     function test_getReleasedTokens_perPhase() public {
         assertEq(project.getReleasedTokens(), 0);
 
-        project.updateState(IProject.ProjectState.Phase1);
+        project.updateState(IProject.ProjectState.Validated);
+        assertEq(project.getReleasedTokens(), 0);
+
+        project.updateState(IProject.ProjectState.Approved);
         assertEq(project.getReleasedTokens(), 100);
 
         project.updateState(IProject.ProjectState.Phase2);

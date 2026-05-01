@@ -14,9 +14,18 @@ interface IProjectManager {
 
     function updateProjectStatus(address _projectAddress, IProject.ProjectState _newState) external;
 
+    function requestProjectValidation(address _projectAddress) external returns (bytes32);
+
+    function getValidationStatus(address _projectAddress)
+        external
+        view
+        returns (bool validated, bool overlap, bool inconclusive, uint256 updatedAt);
+
     function isProjectRegistered(address _projectAddress) external view returns (bool);
 
     function setPricePerToken(uint256 _price) external;
+
+    function setChainlinkConfig(address _linkToken, address _oracle, bytes32 _jobId, uint256 _fee) external;
 
     function getAllProjects() external view returns (address[] memory);
 
