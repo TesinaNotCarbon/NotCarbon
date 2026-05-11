@@ -30,6 +30,3 @@ lcov.info
 # OS files
 .DS_Store
 Thumbs.db
-
-# Optional generated docs
-docs/

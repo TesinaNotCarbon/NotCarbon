@@ -107,6 +107,10 @@ Format Solidity files:
 forge fmt
 ```
 
+## Testing and Deployment Guide
+
+See [docs/testing.md](docs/testing.md) for local (Anvil) and Sepolia flows, plus the new setup and smoke-test scripts.
+
 ## Local Deployment (Anvil)
 
 1. Start local node:
@@ -175,8 +179,8 @@ The script in script/Deploy.s.sol deploys in this order:
 
 Then it runs bootstrap actions:
 
-1. setPricePerToken(10)
-2. mint(10000)
+1. setPricePerToken(PRICE_PER_TOKEN) (default 10)
+2. mint(MINT_AMOUNT) (default 10000)
 
 ## Useful Cast Commands
 
