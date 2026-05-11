@@ -20,8 +20,8 @@ contract IntegrationFlowTest is BaseTest {
         Project p1 = _registerProject(creator, "P1", "Forest restoration", 100, "CELL-001");
         Project p2 = _registerProject(creator, "P2", "Wind expansion", 100, "CELL-002");
 
-        _advanceToPhase4(address(p1));
-        _advanceToPhase4(address(p2));
+        _advanceToMilestone4(address(p1));
+        _advanceToMilestone4(address(p2));
 
         string[] memory approvedCellIds = projectManager.getApprovedCellIds();
         assertEq(approvedCellIds.length, 2);

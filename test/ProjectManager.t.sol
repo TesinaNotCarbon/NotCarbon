@@ -117,9 +117,10 @@ contract ProjectManagerTest is BaseTest {
 
         projectManager.mockValidationResult(address(project), false, false);
         projectManager.updateProjectStatus(address(project), IProject.ProjectState.Approved);
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase2);
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase3);
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase4);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone1);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone2);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone3);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone4);
 
         string[] memory approved = projectManager.getApprovedCellIds();
         assertEq(approved.length, 1);

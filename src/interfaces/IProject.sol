@@ -6,9 +6,10 @@ interface IProject {
         Registered,
         Validated,
         Approved,
-        Phase2,
-        Phase3,
-        Phase4
+        Milestone1,
+        Milestone2,
+        Milestone3,
+        Milestone4
     }
 
     function buyCarbonCredits(uint256 _amount) external payable;

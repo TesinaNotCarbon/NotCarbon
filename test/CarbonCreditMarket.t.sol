@@ -31,7 +31,7 @@ contract MockMarketProject is IProject {
     }
 
     function currentState() external pure override returns (ProjectState) {
-        return ProjectState.Phase4;
+        return ProjectState.Milestone4;
     }
 
     function updateState(ProjectState) external pure override {}

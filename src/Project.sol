@@ -95,12 +95,14 @@ contract Project is IProject {
         } else if (currentState == IProject.ProjectState.Validated) {
             return 0;
         } else if (currentState == IProject.ProjectState.Approved) {
-            return (totalTokens * 10) / 100;
-        } else if (currentState == IProject.ProjectState.Phase2) {
-            return (totalTokens * 40) / 100;
-        } else if (currentState == IProject.ProjectState.Phase3) {
-            return (totalTokens * 60) / 100;
-        } else if (currentState == IProject.ProjectState.Phase4) {
+            return (totalTokens * 5) / 100;
+        } else if (currentState == IProject.ProjectState.Milestone1) {
+            return (totalTokens * 25) / 100;
+        } else if (currentState == IProject.ProjectState.Milestone2) {
+            return (totalTokens * 50) / 100;
+        } else if (currentState == IProject.ProjectState.Milestone3) {
+            return (totalTokens * 75) / 100;
+        } else if (currentState == IProject.ProjectState.Milestone4) {
             return totalTokens;
         }
         return 0;

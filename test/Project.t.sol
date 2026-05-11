@@ -72,18 +72,21 @@ contract ProjectTest is Test {
         project.updateState(IProject.ProjectState.Approved);
         assertEq(project.getReleasedTokens(), 100);
 
-        project.updateState(IProject.ProjectState.Phase2);
-        assertEq(project.getReleasedTokens(), 400);
+        project.updateState(IProject.ProjectState.Milestone1);
+        assertEq(project.getReleasedTokens(), 250);
 
-        project.updateState(IProject.ProjectState.Phase3);
-        assertEq(project.getReleasedTokens(), 600);
+        project.updateState(IProject.ProjectState.Milestone2);
+        assertEq(project.getReleasedTokens(), 500);
 
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone3);
+        assertEq(project.getReleasedTokens(), 750);
+
+        project.updateState(IProject.ProjectState.Milestone4);
         assertEq(project.getReleasedTokens(), 1000);
     }
 
     function test_buyCarbonCredits_revertsForInsufficientEth() public {
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone4);
 
         vm.prank(buyer);
         vm.expectRevert("Insufficient ETH sent");
@@ -97,7 +100,7 @@ contract ProjectTest is Test {
     }
 
     function test_buyCarbonCredits_success() public {
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone4);
 
         vm.prank(buyer);
         vm.expectEmit(true, false, false, true);
@@ -109,7 +112,7 @@ contract ProjectTest is Test {
     }
 
     function test_buyCarbonCredits_refundsExcessEth() public {
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone4);
         uint256 buyerBalanceBefore = buyer.balance;
 
         vm.prank(buyer);
@@ -119,7 +122,7 @@ contract ProjectTest is Test {
     }
 
     function test_buyFor_revertsWhenCompanyNotApproved() public {
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone4);
 
         vm.prank(companyOwner);
         address companyAddress = companyManager.createCompany("Green Corp", 120);
@@ -129,7 +132,7 @@ contract ProjectTest is Test {
     }
 
     function test_buyFor_revertsForInsufficientEth() public {
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone4);
         vm.prank(companyOwner);
         address companyAddress = companyManager.createCompany("Green Corp", 120);
         companyManager.approveCompany(payable(companyAddress));
@@ -139,7 +142,7 @@ contract ProjectTest is Test {
     }
 
     function test_buyFor_successForApprovedCompany() public {
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone4);
         vm.prank(companyOwner);
         address companyAddress = companyManager.createCompany("Green Corp", 120);
         companyManager.approveCompany(payable(companyAddress));
@@ -151,7 +154,7 @@ contract ProjectTest is Test {
     }
 
     function test_buyFor_refundsExcessEthToCaller() public {
-        project.updateState(IProject.ProjectState.Phase4);
+        project.updateState(IProject.ProjectState.Milestone4);
         vm.prank(companyOwner);
         address companyAddress = companyManager.createCompany("Green Corp", 120);
         companyManager.approveCompany(payable(companyAddress));
