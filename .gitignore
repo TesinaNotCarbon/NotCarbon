@@ -4,10 +4,7 @@ out/
 
 # Foundry broadcasts and runs
 # Keep folder in repo but ignore local/dev chain outputs and dry-runs.
-!/broadcast/
-/broadcast/*/31337/
-/broadcast/**/dry-run/
-!/broadcast/**/run-latest.json
+/broadcast
 
 # Coverage and reports
 coverage/

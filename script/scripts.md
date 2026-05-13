@@ -164,6 +164,44 @@ export CARBON_CREDIT_TOKEN_ADDRESS=0x...
 forge script script/Setup.s.sol:Setup --rpc-url http://127.0.0.1:8545 --broadcast
 ```
 
+## Secuencia recomendada (Sepolia)
+
+1) Define el RPC y una clave con fondos en Sepolia:
+
+```bash
+export SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/<project-id>
+export PRIVATE_KEY=0x...
+```
+
+2) Deploy en Sepolia:
+
+```bash
+forge script script/Deploy.s.sol:Deploy --rpc-url $SEPOLIA_RPC_URL --broadcast --priority-gas-price 10000
+```
+
+3) Exporta las direcciones que imprime el deploy:
+
+```bash
+export ROLE_MANAGER_ADDRESS=0x...
+export PROJECT_MANAGER_ADDRESS=0x...
+export CARBON_CREDIT_TOKEN_ADDRESS=0x...
+export COMPANY_MANAGER_ADDRESS=0x...
+export MARKET_ADDRESS=0x...
+```
+
+4) Setup en Sepolia (configuración sin Chainlink):
+
+```bash
+export SET_CHAINLINK=0
+export MOCK_VALIDATION=1
+
+forge script script/Setup.s.sol:Setup --rpc-url $SEPOLIA_RPC_URL --broadcast --slow --priority-gas-price 10000
+```
+
+Notas:
+- Para utilizar Chainlink, seteas `SET_CHAINLINK=1` y completas `CHAINLINK_*`, y `MOCK_VALIDATION` se desactiva automaticamente.
+- Guarda las direcciones de deploy, porque Sepolia no se reinicia como anvil.
+
 ```bash
 export PRIVATE_KEY=0x...
 export ROLE_MANAGER_ADDRESS=0x...
