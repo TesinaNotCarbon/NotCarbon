@@ -34,14 +34,14 @@ contract RoleManagerTest is Test {
 
     function test_addStaff_revertsForNonAdmin() public {
         vm.prank(outsider);
-        vm.expectRevert("Solo el administrador puede ejecutar esta accion");
+        vm.expectRevert("Only admin can execute this action.");
         roleManager.addStaff(staffMember);
     }
 
     function test_addStaff_revertsIfAlreadyStaff() public {
         roleManager.addStaff(staffMember);
 
-        vm.expectRevert("Este usuario ya es staff");
+        vm.expectRevert("User is already staff.");
         roleManager.addStaff(staffMember);
     }
 
@@ -61,7 +61,7 @@ contract RoleManagerTest is Test {
 
     function test_removeStaff_revertsForNonAdmin() public {
         vm.prank(outsider);
-        vm.expectRevert("Solo el administrador puede ejecutar esta accion");
+        vm.expectRevert("Only admin can execute this action.");
         roleManager.removeStaff(staffMember);
     }
 

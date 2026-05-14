@@ -3,11 +3,13 @@ pragma solidity ^0.8.19;
 
 interface IProject {
     enum ProjectState {
-        Phase0,
-        Phase1,
-        Phase2,
-        Phase3,
-        Phase4
+        Registered,
+        Validated,
+        Approved,
+        Milestone1,
+        Milestone2,
+        Milestone3,
+        Milestone4
     }
 
     function buyCarbonCredits(uint256 _amount) external payable;

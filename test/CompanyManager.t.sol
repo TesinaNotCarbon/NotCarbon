@@ -44,12 +44,12 @@ contract CompanyManagerTest is BaseTest {
         address companyAddress = companyManager.createCompany("Acme", 150);
 
         vm.prank(outsider);
-        vm.expectRevert("No tenes permiso");
+        vm.expectRevert("Only staff or admin can execute this action.");
         companyManager.approveCompany(payable(companyAddress));
     }
 
     function test_approveCompany_revertsIfNotRegistered() public {
-        vm.expectRevert("Empresa no registrada");
+        vm.expectRevert("Company not registered.");
         companyManager.approveCompany(payable(address(0x1234)));
     }
 
@@ -85,7 +85,7 @@ contract CompanyManagerTest is BaseTest {
     }
 
     function test_isApproved_revertsIfNotRegistered() public {
-        vm.expectRevert("Empresa no registrada");
+        vm.expectRevert("Company not registered.");
         companyManager.isApproved(payable(address(0x1234)));
     }
 }

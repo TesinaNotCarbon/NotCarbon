@@ -79,10 +79,12 @@ abstract contract BaseTest is Test {
         return Project(payable(projectAddress));
     }
 
-    function _advanceToPhase4(address projectAddress) internal {
-        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase1);
-        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase2);
-        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase3);
-        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Phase4);
+    function _advanceToMilestone4(address projectAddress) internal {
+        projectManager.mockValidationResult(projectAddress, false, false);
+        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Approved);
+        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Milestone1);
+        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Milestone2);
+        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Milestone3);
+        projectManager.updateProjectStatus(projectAddress, IProject.ProjectState.Milestone4);
     }
 }

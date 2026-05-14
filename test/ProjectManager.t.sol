@@ -65,23 +65,24 @@ contract ProjectManagerTest is BaseTest {
 
         vm.prank(outsider);
         vm.expectRevert("Only staff or admin can execute this function.");
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase1);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Approved);
     }
 
     function test_updateProjectStatus_revertsForUnregisteredProject() public {
         vm.expectRevert("Project is not registered.");
-        projectManager.updateProjectStatus(address(0x1234), IProject.ProjectState.Phase1);
+        projectManager.updateProjectStatus(address(0x1234), IProject.ProjectState.Approved);
     }
 
     function test_updateProjectStatus_successByAdmin() public {
         _bootstrapPriceAndMint(1 ether, 1000);
         Project project = _registerProject(creator, "Solar", "Solar farm", 200);
 
+        projectManager.mockValidationResult(address(project), false, false);
         vm.expectEmit(true, false, false, true);
-        emit ProjectStateUpdated(address(project), IProject.ProjectState.Phase1);
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase1);
+        emit ProjectStateUpdated(address(project), IProject.ProjectState.Approved);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Approved);
 
-        assertEq(uint256(project.currentState()), uint256(IProject.ProjectState.Phase1));
+        assertEq(uint256(project.currentState()), uint256(IProject.ProjectState.Approved));
     }
 
     function test_registerProject_revertsWhenCellIdAlreadyUsed() public {
@@ -95,13 +96,14 @@ contract ProjectManagerTest is BaseTest {
         projectManager.registerProject("Wind", "Wind farm", address(token), 500, "CELL-001");
     }
 
-    function test_updateProjectStatus_recordsApprovedCellIdOnPhase1() public {
+    function test_updateProjectStatus_recordsApprovedCellIdOnApproved() public {
         _bootstrapPriceAndMint(1 ether, 1000);
         Project project = _registerProject(creator, "Solar", "Solar farm", 200);
 
+        projectManager.mockValidationResult(address(project), false, false);
         vm.expectEmit(true, false, false, true);
         emit ApprovedCellIdRecorded(address(project), "CELL-001");
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase1);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Approved);
 
         assertTrue(projectManager.isApprovedCellId("CELL-001"));
         string[] memory approved = projectManager.getApprovedCellIds();
@@ -113,10 +115,12 @@ contract ProjectManagerTest is BaseTest {
         _bootstrapPriceAndMint(1 ether, 1000);
         Project project = _registerProject(creator, "Solar", "Solar farm", 200);
 
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase1);
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase2);
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase3);
-        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Phase4);
+        projectManager.mockValidationResult(address(project), false, false);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Approved);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone1);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone2);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone3);
+        projectManager.updateProjectStatus(address(project), IProject.ProjectState.Milestone4);
 
         string[] memory approved = projectManager.getApprovedCellIds();
         assertEq(approved.length, 1);

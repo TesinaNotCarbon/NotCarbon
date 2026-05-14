@@ -12,6 +12,8 @@ import {CarbonCreditMarket} from "../src/CarbonCreditMarket.sol";
 contract Deploy is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        uint256 pricePerToken = vm.envOr("PRICE_PER_TOKEN", uint256(10));
+        uint256 mintAmount = vm.envOr("MINT_AMOUNT", uint256(10000));
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -21,8 +23,8 @@ contract Deploy is Script {
         CarbonCreditToken carbonToken = new CarbonCreditToken(address(projectManager), address(roleManager));
         CarbonCreditMarket carbonMarket = new CarbonCreditMarket(address(projectManager), address(companyManager));
 
-        projectManager.setPricePerToken(10);
-        carbonToken.mint(10000);
+        projectManager.setPricePerToken(pricePerToken);
+        carbonToken.mint(mintAmount);
 
         vm.stopBroadcast();
 
@@ -31,5 +33,7 @@ contract Deploy is Script {
         console2.log("ProjectManager:", address(projectManager));
         console2.log("CarbonCreditToken:", address(carbonToken));
         console2.log("CarbonCreditMarket:", address(carbonMarket));
+        console2.log("PricePerToken:", pricePerToken);
+        console2.log("MintAmount:", mintAmount);
     }
 }
