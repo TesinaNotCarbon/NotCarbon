@@ -52,7 +52,8 @@ contract SmokeTest is Script {
                 currentState = project.currentState();
             } else {
                 bytes32 requestId = projectManager.requestProjectValidation(projectAddress);
-                console2.log("Validation requested:", requestId);
+                console2.log("Validation requested:");
+                console2.logBytes32(requestId);
                 console2.log("Project address:", projectAddress);
                 vm.stopBroadcast();
                 return;
