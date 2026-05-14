@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
 import {RoleManager} from "../src/RoleManager.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract RoleManagerTest is Test {
     RoleManager public roleManager;
@@ -13,7 +14,14 @@ contract RoleManagerTest is Test {
     event StaffRemoved(address indexed staffMember);
 
     function setUp() public {
-        roleManager = new RoleManager();
+        RoleManager roleManagerImpl = new RoleManager();
+        roleManager = RoleManager(
+            address(
+                new ERC1967Proxy(
+                    address(roleManagerImpl), abi.encodeCall(RoleManager.initialize, (address(this), address(this)))
+                )
+            )
+        );
     }
 
     function test_adminIsDeployer() public view {

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Project} from "./Project.sol";
 import {CarbonCreditToken} from "./CarbonCreditToken.sol";
 import {IRoleManager} from "./interfaces/IRoleManager.sol";
@@ -13,10 +16,11 @@ import {
     LinkTokenInterface
 } from "chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 
-contract ProjectManager is IProjectManager, ChainlinkClient {
+contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, IProjectManager, ChainlinkClient {
     using Chainlink for Chainlink.Request;
 
     address public admin;
+    address public upgradeController;
     mapping(address => bool) public registeredProjects;
     mapping(bytes32 => bool) public usedCellIds;
     mapping(bytes32 => bool) public approvedCellIds;
@@ -34,10 +38,24 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         uint256 updatedAt;
     }
 
+    struct ValidationRequestInfo {
+        bytes32 requestId;
+        bool pending;
+        uint256 requestedAt;
+    }
+
+    struct CellIdRecord {
+        bool used;
+        bool approved;
+        bool projectApprovalRecorded;
+    }
+
     mapping(address => ValidationStatus) private validationStatus;
     mapping(bytes32 => address) public validationRequests;
     mapping(address => bool) public validationPending;
     mapping(address => bytes32) public lastValidationRequestId;
+    mapping(address => ValidationRequestInfo) private validationByProject;
+    mapping(bytes32 => CellIdRecord) private cellIdRecords;
 
     address public validationOracle;
     bytes32 public validationJobId;
@@ -61,10 +79,33 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         _;
     }
 
-    constructor(address _roleManager, address _companyManager) {
-        admin = msg.sender;
+    modifier onlyUpgradeController() {
+        require(msg.sender == upgradeController, "Only upgrade controller.");
+        _;
+    }
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _roleManager, address _companyManager, address _admin, address _upgradeController)
+        public
+        initializer
+    {
+        require(_roleManager != address(0), "Invalid role manager.");
+        require(_companyManager != address(0), "Invalid company manager.");
+        require(_admin != address(0), "Invalid admin.");
+        require(_upgradeController != address(0), "Invalid upgrade controller.");
+        __Pausable_init();
+        admin = _admin;
         roleManager = IRoleManager(_roleManager);
         companyManager = ICompanyManager(_companyManager);
+        upgradeController = _upgradeController;
+    }
+
+    function setUpgradeController(address _upgradeController) external onlyUpgradeController {
+        require(_upgradeController != address(0), "Invalid upgrade controller.");
+        upgradeController = _upgradeController;
     }
 
     function registerProject(
@@ -75,7 +116,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         string memory _cellId
     ) public override returns (address) {
         bytes32 cellIdHash = keccak256(bytes(_cellId));
-        require(!usedCellIds[cellIdHash], "Cell ID already used.");
+        require(!usedCellIds[cellIdHash] && !cellIdRecords[cellIdHash].used, "Cell ID already used.");
 
         // Create the project contract, with ProjectState.Registered
         Project newProject = new Project(
@@ -92,6 +133,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         address projectAddress = address(newProject);
         registeredProjects[projectAddress] = true;
         usedCellIds[cellIdHash] = true;
+        cellIdRecords[cellIdHash].used = true;
         projectList.push(projectAddress);
 
         // Transfer the tokens from the CarbonCreditToken contract to the new project contract
@@ -106,6 +148,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         public
         override
         onlyApprover
+        whenNotPaused
     {
         require(registeredProjects[_projectAddress], "Project is not registered.");
         IProject project = IProject(_projectAddress);
@@ -122,13 +165,19 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
 
         project.updateState(_newState);
 
-        if (_newState >= IProject.ProjectState.Approved && !projectApprovalRecorded[_projectAddress]) {
+        if (_newState >= IProject.ProjectState.Approved) {
             string memory projectCellId = project.cellId();
             bytes32 cellIdHash = keccak256(bytes(projectCellId));
-            approvedCellIds[cellIdHash] = true;
-            projectApprovalRecorded[_projectAddress] = true;
-            approvedCellIdList.push(projectCellId);
-            emit ApprovedCellIdRecorded(_projectAddress, projectCellId);
+            bool alreadyRecorded =
+                projectApprovalRecorded[_projectAddress] || cellIdRecords[cellIdHash].projectApprovalRecorded;
+            if (!alreadyRecorded) {
+                approvedCellIds[cellIdHash] = true;
+                projectApprovalRecorded[_projectAddress] = true;
+                cellIdRecords[cellIdHash].approved = true;
+                cellIdRecords[cellIdHash].projectApprovalRecorded = true;
+                approvedCellIdList.push(projectCellId);
+                emit ApprovedCellIdRecorded(_projectAddress, projectCellId);
+            }
         }
 
         emit ProjectStateUpdated(_projectAddress, _newState);
@@ -157,11 +206,12 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         validationFee = _fee;
     }
 
-    function requestProjectValidation(address _projectAddress) public override returns (bytes32) {
+    function requestProjectValidation(address _projectAddress) public override whenNotPaused returns (bytes32) {
         require(registeredProjects[_projectAddress], "Project is not registered.");
         IProject project = IProject(_projectAddress);
         require(project.currentState() == IProject.ProjectState.Registered, "Project must be registered.");
-        require(!validationPending[_projectAddress], "Validation already pending.");
+        ValidationRequestInfo storage requestInfo = validationByProject[_projectAddress];
+        require(!validationPending[_projectAddress] && !requestInfo.pending, "Validation already pending.");
         require(validationOracle != address(0), "Chainlink config not set.");
 
         Chainlink.Request memory req = _buildOperatorRequest(validationJobId, this.fulfillValidation.selector);
@@ -171,6 +221,9 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
         validationRequests[requestId] = _projectAddress;
         lastValidationRequestId[_projectAddress] = requestId;
         validationPending[_projectAddress] = true;
+        requestInfo.requestId = requestId;
+        requestInfo.pending = true;
+        requestInfo.requestedAt = block.timestamp;
 
         emit ProjectValidationRequested(_projectAddress, requestId, project.cellId());
         return requestId;
@@ -179,13 +232,18 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
     function fulfillValidation(bytes32 _requestId, bool _overlap, bool _inconclusive)
         public
         recordChainlinkFulfillment(_requestId)
+        whenNotPaused
     {
         address projectAddress = validationRequests[_requestId];
         require(projectAddress != address(0), "Unknown request id.");
         _applyValidationResult(projectAddress, _requestId, _overlap, _inconclusive);
     }
 
-    function mockValidationResult(address _projectAddress, bool _overlap, bool _inconclusive) public onlyAdmin {
+    function mockValidationResult(address _projectAddress, bool _overlap, bool _inconclusive)
+        public
+        onlyAdmin
+        whenNotPaused
+    {
         require(validationOracle == address(0), "Mock disabled when oracle set.");
         require(registeredProjects[_projectAddress], "Project is not registered.");
         _applyValidationResult(_projectAddress, bytes32(0), _overlap, _inconclusive);
@@ -206,7 +264,8 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
     }
 
     function isApprovedCellId(string memory _cellId) public view override returns (bool) {
-        return approvedCellIds[keccak256(bytes(_cellId))];
+        bytes32 cellIdHash = keccak256(bytes(_cellId));
+        return approvedCellIds[cellIdHash] || cellIdRecords[cellIdHash].approved;
     }
 
     function getApprovedCellIds() public view override returns (string[] memory) {
@@ -227,6 +286,7 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
             validated: isValidated, overlap: _overlap, inconclusive: _inconclusive, updatedAt: block.timestamp
         });
         validationPending[_projectAddress] = false;
+        validationByProject[_projectAddress].pending = false;
 
         if (isValidated) {
             IProject project = IProject(_projectAddress);
@@ -237,4 +297,16 @@ contract ProjectManager is IProjectManager, ChainlinkClient {
 
         emit ProjectValidationCompleted(_projectAddress, _requestId, isValidated, _overlap, _inconclusive);
     }
+
+    function pause() external onlyUpgradeController {
+        _pause();
+    }
+
+    function unpause() external onlyUpgradeController {
+        _unpause();
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyUpgradeController {}
+
+    uint256[50] private __gap;
 }

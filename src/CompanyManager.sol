@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IRoleManager} from "./interfaces/IRoleManager.sol";
 import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
 import {Company} from "./Company.sol";
 
-contract CompanyManager is ICompanyManager {
+contract CompanyManager is Initializable, UUPSUpgradeable, ICompanyManager {
     mapping(address => bool) public registeredCompanies;
     address[] public companyList;
     IRoleManager public roleManager;
+    address public upgradeController;
 
     event CompanyCreated(address indexed owner, address companyContract, string name);
     event CompanyApproved(address indexed companyContract);
@@ -18,8 +21,25 @@ contract CompanyManager is ICompanyManager {
         _;
     }
 
-    constructor(address _roleManagerAddress) {
+    modifier onlyUpgradeController() {
+        require(msg.sender == upgradeController, "Only upgrade controller.");
+        _;
+    }
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _roleManagerAddress, address _upgradeController) public initializer {
+        require(_roleManagerAddress != address(0), "Invalid role manager.");
+        require(_upgradeController != address(0), "Invalid upgrade controller.");
         roleManager = IRoleManager(_roleManagerAddress);
+        upgradeController = _upgradeController;
+    }
+
+    function setUpgradeController(address _upgradeController) external onlyUpgradeController {
+        require(_upgradeController != address(0), "Invalid upgrade controller.");
+        upgradeController = _upgradeController;
     }
 
     function createCompany(string memory _name, uint256 _monthlyEmissions) public override returns (address) {
@@ -49,4 +69,8 @@ contract CompanyManager is ICompanyManager {
     function getAllCompanies() public view override returns (address[] memory) {
         return companyList;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyUpgradeController {}
+
+    uint256[50] private __gap;
 }

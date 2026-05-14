@@ -5,20 +5,29 @@ import {IProject} from "./interfaces/IProject.sol";
 import {ICarbonCreditToken} from "./interfaces/ICarbonCreditToken.sol";
 
 contract Project is IProject {
-    address public projectManager;
-    address public creator;
-    string public override projectName;
-    string public override projectDescription;
+    struct ProjectMeta {
+        string name;
+        string description;
+        string cellId;
+    }
 
-    IProject.ProjectState public override currentState;
+    struct ProjectAccounts {
+        address projectManager;
+        address creator;
+        address carbonCreditTokenAddress;
+        address companyManager;
+    }
 
-    address public carbonCreditTokenAddress;
-    uint256 public totalTokens;
-    uint256 public purchasedTokens;
-    uint256 public override pricePerToken;
-    ICompanyManager public companyManager;
-    ICarbonCreditToken public token;
-    string public override cellId;
+    struct ProjectEconomics {
+        uint256 totalTokens;
+        uint256 purchasedTokens;
+        uint256 pricePerToken;
+    }
+
+    ProjectMeta private meta;
+    ProjectAccounts private accounts;
+    ProjectEconomics private economics;
+    IProject.ProjectState private state;
 
     event Deposit(address indexed from, uint256 amount);
     event StateChanged(ProjectState newState);
@@ -32,12 +41,12 @@ contract Project is IProject {
     }
 
     modifier onlyProjectManager() {
-        require(msg.sender == projectManager, "Only the project manager can execute this function.");
+        require(msg.sender == accounts.projectManager, "Only the project manager can execute this function.");
         _;
     }
 
     modifier onlyCreator() {
-        require(msg.sender == creator, "Only the project creator can execute this function.");
+        require(msg.sender == accounts.creator, "Only the project creator can execute this function.");
         _;
     }
 
@@ -51,34 +60,81 @@ contract Project is IProject {
         ICompanyManager _companyManager,
         string memory _cellId
     ) {
-        projectManager = msg.sender;
-        projectName = _name;
-        projectDescription = _description;
-        currentState = IProject.ProjectState.Registered;
-        carbonCreditTokenAddress = _carbonCreditTokenAddress;
-        token = ICarbonCreditToken(_carbonCreditTokenAddress);
-        totalTokens = _totalTokens;
-        purchasedTokens = 0;
-        creator = _creator;
-        pricePerToken = _pricePerToken;
-        companyManager = _companyManager;
-        cellId = _cellId;
+        accounts.projectManager = msg.sender;
+        accounts.creator = _creator;
+        accounts.carbonCreditTokenAddress = _carbonCreditTokenAddress;
+        accounts.companyManager = address(_companyManager);
+        meta.name = _name;
+        meta.description = _description;
+        meta.cellId = _cellId;
+        state = IProject.ProjectState.Registered;
+        economics.totalTokens = _totalTokens;
+        economics.purchasedTokens = 0;
+        economics.pricePerToken = _pricePerToken;
+    }
+
+    function projectManager() public view returns (address) {
+        return accounts.projectManager;
+    }
+
+    function creator() public view returns (address) {
+        return accounts.creator;
+    }
+
+    function carbonCreditTokenAddress() public view returns (address) {
+        return accounts.carbonCreditTokenAddress;
+    }
+
+    function companyManager() public view returns (ICompanyManager) {
+        return ICompanyManager(accounts.companyManager);
+    }
+
+    function token() public view returns (ICarbonCreditToken) {
+        return ICarbonCreditToken(accounts.carbonCreditTokenAddress);
+    }
+
+    function totalTokens() public view returns (uint256) {
+        return economics.totalTokens;
+    }
+
+    function purchasedTokens() public view returns (uint256) {
+        return economics.purchasedTokens;
+    }
+
+    function projectName() public view override returns (string memory) {
+        return meta.name;
+    }
+
+    function projectDescription() public view override returns (string memory) {
+        return meta.description;
+    }
+
+    function cellId() public view override returns (string memory) {
+        return meta.cellId;
+    }
+
+    function pricePerToken() public view override returns (uint256) {
+        return economics.pricePerToken;
+    }
+
+    function currentState() public view override returns (IProject.ProjectState) {
+        return state;
     }
 
     // Update token price (only the project manager can call).
     function setPricePerToken(uint256 _price) public onlyProjectManager {
-        pricePerToken = _price;
+        economics.pricePerToken = _price;
     }
 
     // Update the project state.
     function updateState(IProject.ProjectState _newState) external onlyProjectManager {
-        require(uint256(_newState) > uint256(currentState), "New state must be a higher phase.");
-        currentState = _newState;
+        require(uint256(_newState) > uint256(state), "New state must be a higher phase.");
+        state = _newState;
         emit StateChanged(_newState);
     }
 
     function getCreator() public view returns (address) {
-        return creator;
+        return accounts.creator;
     }
 
     function deposit() external payable {
@@ -90,20 +146,20 @@ contract Project is IProject {
     }
 
     function getReleasedTokens() public view override returns (uint256) {
-        if (currentState == IProject.ProjectState.Registered) {
+        if (state == IProject.ProjectState.Registered) {
             return 0;
-        } else if (currentState == IProject.ProjectState.Validated) {
+        } else if (state == IProject.ProjectState.Validated) {
             return 0;
-        } else if (currentState == IProject.ProjectState.Approved) {
-            return (totalTokens * 10) / 100;
-        } else if (currentState == IProject.ProjectState.Milestone1) {
-            return (totalTokens * 25) / 100;
-        } else if (currentState == IProject.ProjectState.Milestone2) {
-            return (totalTokens * 50) / 100;
-        } else if (currentState == IProject.ProjectState.Milestone3) {
-            return (totalTokens * 75) / 100;
-        } else if (currentState == IProject.ProjectState.Milestone4) {
-            return totalTokens;
+        } else if (state == IProject.ProjectState.Approved) {
+            return (economics.totalTokens * 10) / 100;
+        } else if (state == IProject.ProjectState.Milestone1) {
+            return (economics.totalTokens * 25) / 100;
+        } else if (state == IProject.ProjectState.Milestone2) {
+            return (economics.totalTokens * 50) / 100;
+        } else if (state == IProject.ProjectState.Milestone3) {
+            return (economics.totalTokens * 75) / 100;
+        } else if (state == IProject.ProjectState.Milestone4) {
+            return economics.totalTokens;
         }
         return 0;
     }
@@ -111,20 +167,21 @@ contract Project is IProject {
     // Buy tokens with ETH.
     function buyCarbonCredits(uint256 _amount) external payable override {
         // Ensure the caller sent enough ETH.
-        uint256 totalCost = _amount * pricePerToken;
+        uint256 totalCost = _amount * economics.pricePerToken;
         require(msg.value >= totalCost, "Insufficient ETH sent");
 
         // Ensure enough tokens are released for this phase.
         require(_amount <= getAvailableTokens(), "Amount exceeds available tokens for this phase");
 
         // Ensure the contract has enough tokens.
-        require(token.balanceOf(address(this)) >= _amount, "Insufficient token balance");
+        ICarbonCreditToken projectToken = ICarbonCreditToken(accounts.carbonCreditTokenAddress);
+        require(projectToken.balanceOf(address(this)) >= _amount, "Insufficient token balance");
 
         // Transfer tokens to the buyer.
-        require(token.transfer(msg.sender, _amount), "Token transfer failed");
+        require(projectToken.transfer(msg.sender, _amount), "Token transfer failed");
 
         // Update purchased token count.
-        purchasedTokens += _amount;
+        economics.purchasedTokens += _amount;
 
         _refund(payable(msg.sender), msg.value - totalCost);
 
@@ -134,21 +191,22 @@ contract Project is IProject {
     // Allow the creator to withdraw accumulated ETH.
     function withdrawETH(uint256 _amount) public onlyCreator {
         require(address(this).balance >= _amount, "Insufficient ETH balance");
-        (bool ok,) = payable(creator).call{value: _amount}("");
+        (bool ok,) = payable(accounts.creator).call{value: _amount}("");
         require(ok, "ETH transfer failed");
-        emit ETHWithdrawn(creator, _amount);
+        emit ETHWithdrawn(accounts.creator, _amount);
     }
 
     function buyFor(address buyer, uint256 amount) external payable override {
-        require(companyManager.isApproved(payable(buyer)), "Company not approved");
-        uint256 totalCost = amount * pricePerToken;
+        require(ICompanyManager(accounts.companyManager).isApproved(payable(buyer)), "Company not approved");
+        uint256 totalCost = amount * economics.pricePerToken;
         require(msg.value >= totalCost, "Insufficient ETH");
 
-        require(getReleasedTokens() - purchasedTokens >= amount, "Not enough tokens released");
-        require(token.balanceOf(address(this)) >= amount, "Insufficient balance");
+        require(getReleasedTokens() - economics.purchasedTokens >= amount, "Not enough tokens released");
+        ICarbonCreditToken projectToken = ICarbonCreditToken(accounts.carbonCreditTokenAddress);
+        require(projectToken.balanceOf(address(this)) >= amount, "Insufficient balance");
 
-        require(token.transfer(buyer, amount), "Transfer failed");
-        purchasedTokens += amount;
+        require(projectToken.transfer(buyer, amount), "Transfer failed");
+        economics.purchasedTokens += amount;
 
         _refund(payable(msg.sender), msg.value - totalCost);
 
@@ -156,6 +214,6 @@ contract Project is IProject {
     }
 
     function getAvailableTokens() public view override returns (uint256) {
-        return getReleasedTokens() - purchasedTokens;
+        return getReleasedTokens() - economics.purchasedTokens;
     }
 }

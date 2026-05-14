@@ -10,6 +10,7 @@ import {CarbonCreditMarket} from "../src/CarbonCreditMarket.sol";
 import {Company} from "../src/Company.sol";
 import {Project} from "../src/Project.sol";
 import {IProject} from "../src/interfaces/IProject.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 abstract contract BaseTest is Test {
     address internal staff = address(0xA11CE);
@@ -25,11 +26,62 @@ abstract contract BaseTest is Test {
     CarbonCreditMarket internal market;
 
     function _deployCore() internal {
-        roleManager = new RoleManager();
-        companyManager = new CompanyManager(address(roleManager));
-        projectManager = new ProjectManager(address(roleManager), address(companyManager));
-        token = new CarbonCreditToken(address(projectManager), address(roleManager));
-        market = new CarbonCreditMarket(address(projectManager), address(companyManager));
+        RoleManager roleManagerImpl = new RoleManager();
+        roleManager = RoleManager(
+            address(
+                new ERC1967Proxy(
+                    address(roleManagerImpl), abi.encodeCall(RoleManager.initialize, (address(this), address(this)))
+                )
+            )
+        );
+
+        CompanyManager companyManagerImpl = new CompanyManager();
+        companyManager = CompanyManager(
+            address(
+                new ERC1967Proxy(
+                    address(companyManagerImpl),
+                    abi.encodeCall(CompanyManager.initialize, (address(roleManager), address(this)))
+                )
+            )
+        );
+
+        ProjectManager projectManagerImpl = new ProjectManager();
+        projectManager = ProjectManager(
+            address(
+                new ERC1967Proxy(
+                    address(projectManagerImpl),
+                    abi.encodeCall(
+                        ProjectManager.initialize,
+                        (address(roleManager), address(companyManager), address(this), address(this))
+                    )
+                )
+            )
+        );
+
+        CarbonCreditToken tokenImpl = new CarbonCreditToken();
+        token = CarbonCreditToken(
+            address(
+                new ERC1967Proxy(
+                    address(tokenImpl),
+                    abi.encodeCall(
+                        CarbonCreditToken.initialize,
+                        (address(projectManager), address(roleManager), address(this), address(this))
+                    )
+                )
+            )
+        );
+
+        CarbonCreditMarket marketImpl = new CarbonCreditMarket();
+        market = CarbonCreditMarket(
+            address(
+                new ERC1967Proxy(
+                    address(marketImpl),
+                    abi.encodeCall(
+                        CarbonCreditMarket.initialize, (address(projectManager), address(companyManager), address(this))
+                    )
+                )
+            )
+        );
 
         vm.deal(staff, 100 ether);
         vm.deal(outsider, 100 ether);
