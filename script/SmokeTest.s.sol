@@ -39,11 +39,7 @@ contract SmokeTest is Script {
 
         if (projectAddress == address(0)) {
             projectAddress = projectManager.registerProject(
-                projectName,
-                projectDescription,
-                address(token),
-                projectTotalTokens,
-                projectCellId
+                projectName, projectDescription, address(token), projectTotalTokens, projectCellId
             );
         }
 
@@ -88,11 +84,9 @@ contract SmokeTest is Script {
         console2.log("TotalCost:", totalCost);
     }
 
-    function _advanceIfNeeded(
-        ProjectManager projectManager,
-        address projectAddress,
-        IProject.ProjectState targetState
-    ) internal {
+    function _advanceIfNeeded(ProjectManager projectManager, address projectAddress, IProject.ProjectState targetState)
+        internal
+    {
         IProject project = IProject(projectAddress);
         if (uint256(project.currentState()) < uint256(targetState)) {
             projectManager.updateProjectStatus(projectAddress, targetState);

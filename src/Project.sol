@@ -95,7 +95,7 @@ contract Project is IProject {
         } else if (currentState == IProject.ProjectState.Validated) {
             return 0;
         } else if (currentState == IProject.ProjectState.Approved) {
-            return (totalTokens * 5) / 100;
+            return (totalTokens * 10) / 100;
         } else if (currentState == IProject.ProjectState.Milestone1) {
             return (totalTokens * 25) / 100;
         } else if (currentState == IProject.ProjectState.Milestone2) {
