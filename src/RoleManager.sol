@@ -11,12 +11,12 @@ contract RoleManager is IRoleManager {
     event StaffRemoved(address indexed staffMember);
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Solo el administrador puede ejecutar esta accion");
+        require(msg.sender == admin, "Only admin can execute this action.");
         _;
     }
 
     modifier onlyStaffOrAdmin() {
-        require(msg.sender == admin || staff[msg.sender], "No tenes permisos para realizar esa accion!");
+        require(msg.sender == admin || staff[msg.sender], "Only staff or admin can execute this action.");
         _;
     }
 
@@ -25,7 +25,7 @@ contract RoleManager is IRoleManager {
     }
 
     function addStaff(address _staff) public onlyAdmin {
-        require(!staff[_staff], "Este usuario ya es staff");
+        require(!staff[_staff], "User is already staff.");
         staff[_staff] = true;
         emit StaffAdded(_staff);
     }

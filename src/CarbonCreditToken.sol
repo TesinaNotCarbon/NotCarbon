@@ -9,7 +9,7 @@ contract CarbonCreditToken is ERC20, ICarbonCreditToken {
     address public admin;
     address public projectManager;
     IRoleManager public roleManager;
-    // Evento para registrar la creación de nuevos tokens
+    // Event to record minting new tokens.
     event TokensMinted(address indexed to, uint256 amount);
 
     modifier onlyProjectManager() {
@@ -44,20 +44,20 @@ contract CarbonCreditToken is ERC20, ICarbonCreditToken {
         return super.balanceOf(account);
     }
 
-    // Función para minar (crear) nuevos tokens y asignarlos al contrato
+    // Mint new tokens and assign them to the contract.
     function mint(uint256 amount) public override onlyApprover {
         _mint(address(this), amount);
         emit TokensMinted(address(this), amount);
     }
 
-    // Función para transferir tokens desde el contrato a otra dirección
+    // Transfer tokens from the contract to another address.
     function transferTokens(address recipient, uint256 amount) public override onlyProjectManager {
         require(balanceOf(address(this)) >= amount, "Insufficient token balance in contract");
         _transfer(address(this), recipient, amount);
     }
 
-    // Función para quemar (destruir) tokens
+    // Burn tokens.
     function burn(uint256 amount) public override {
-        _burn(msg.sender, amount); // Quema tokens de la dirección que llama la función
+        _burn(msg.sender, amount); // Burn tokens from the caller.
     }
 }

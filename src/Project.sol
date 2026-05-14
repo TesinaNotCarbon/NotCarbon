@@ -65,12 +65,12 @@ contract Project is IProject {
         cellId = _cellId;
     }
 
-    // Función para actualizar el precio por token (solo el project manager puede llamarla)
+    // Update token price (only the project manager can call).
     function setPricePerToken(uint256 _price) public onlyProjectManager {
         pricePerToken = _price;
     }
 
-    // Función para actualizar el estado del proyecto
+    // Update the project state.
     function updateState(IProject.ProjectState _newState) external onlyProjectManager {
         require(uint256(_newState) > uint256(currentState), "New state must be a higher phase.");
         currentState = _newState;
@@ -108,22 +108,22 @@ contract Project is IProject {
         return 0;
     }
 
-    // Función para comprar tokens con ETH
+    // Buy tokens with ETH.
     function buyCarbonCredits(uint256 _amount) external payable override {
-        // Verificar que el usuario haya enviado suficiente ETH
+        // Ensure the caller sent enough ETH.
         uint256 totalCost = _amount * pricePerToken;
         require(msg.value >= totalCost, "Insufficient ETH sent");
 
-        // Verificar que hay suficientes tokens liberados
+        // Ensure enough tokens are released for this phase.
         require(_amount <= getAvailableTokens(), "Amount exceeds available tokens for this phase");
 
-        // Verificar que el contrato tiene suficientes tokens
+        // Ensure the contract has enough tokens.
         require(token.balanceOf(address(this)) >= _amount, "Insufficient token balance");
 
-        // Transferir tokens al usuario
+        // Transfer tokens to the buyer.
         require(token.transfer(msg.sender, _amount), "Token transfer failed");
 
-        // Actualizar la cantidad de tokens comprados
+        // Update purchased token count.
         purchasedTokens += _amount;
 
         _refund(payable(msg.sender), msg.value - totalCost);
@@ -131,7 +131,7 @@ contract Project is IProject {
         emit TokensPurchased(msg.sender, _amount);
     }
 
-    // Función para que el creator retire el ETH acumulado
+    // Allow the creator to withdraw accumulated ETH.
     function withdrawETH(uint256 _amount) public onlyCreator {
         require(address(this).balance >= _amount, "Insufficient ETH balance");
         (bool ok,) = payable(creator).call{value: _amount}("");

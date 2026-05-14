@@ -53,7 +53,7 @@ contract CarbonCreditMarket is ICarbonCreditMarket {
 
         require(remaining == 0, "Could not complete purchase with available projects");
 
-        // Devolver ETH sobrante
+        // Refund excess ETH.
         uint256 refund = 0;
         if (msg.value > totalSpent) {
             refund = msg.value - totalSpent;

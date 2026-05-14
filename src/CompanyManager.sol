@@ -14,7 +14,7 @@ contract CompanyManager is ICompanyManager {
     event CompanyApproved(address indexed companyContract);
 
     modifier onlyApprover() {
-        require(roleManager.isStaffOrAdmin(msg.sender), "No tenes permiso");
+        require(roleManager.isStaffOrAdmin(msg.sender), "Only staff or admin can execute this action.");
         _;
     }
 
@@ -34,14 +34,14 @@ contract CompanyManager is ICompanyManager {
     }
 
     function approveCompany(address payable _companyAddress) public override onlyApprover {
-        require(registeredCompanies[_companyAddress], "Empresa no registrada");
+        require(registeredCompanies[_companyAddress], "Company not registered.");
         Company company = Company(_companyAddress);
         company.approve();
         emit CompanyApproved(_companyAddress);
     }
 
     function isApproved(address payable _companyAddress) external view override returns (bool) {
-        require(registeredCompanies[_companyAddress], "Empresa no registrada");
+        require(registeredCompanies[_companyAddress], "Company not registered.");
         Company company = Company(_companyAddress);
         return company.isApproved();
     }
