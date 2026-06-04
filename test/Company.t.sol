@@ -80,7 +80,15 @@ contract MockProjectManagerForCompany is IProjectManager {
     }
     function setPricePerToken(uint256) external pure override {}
 
-    function setChainlinkConfig(address, address, bytes32, uint256) external pure override {}
+    function setValidationOracleAdapter(address) external pure override {}
+
+    function validationOracleAdapter() external pure override returns (address) {
+        return address(0);
+    }
+
+    function isValidationOracleConfigured() external pure override returns (bool) {
+        return false;
+    }
 
     function getAllProjects() external pure override returns (address[] memory) {
         address[] memory p = new address[](0);

@@ -9,6 +9,7 @@ import {CarbonCreditToken} from "../src/CarbonCreditToken.sol";
 import {CarbonCreditMarket} from "../src/CarbonCreditMarket.sol";
 import {Company} from "../src/Company.sol";
 import {IProject} from "../src/interfaces/IProject.sol";
+import {IProjectValidationOracle} from "../src/interfaces/IProjectValidationOracle.sol";
 
 contract SmokeTest is Script {
     function run() external {
@@ -47,7 +48,10 @@ contract SmokeTest is Script {
         IProject.ProjectState currentState = project.currentState();
 
         if (uint256(currentState) < uint256(IProject.ProjectState.Validated)) {
-            if (projectManager.validationOracle() == address(0)) {
+            address adapter = projectManager.validationOracleAdapter();
+            bool oracleConfigured =
+                adapter != address(0) && IProjectValidationOracle(adapter).isConfigured();
+            if (!oracleConfigured) {
                 projectManager.mockValidationResult(projectAddress, false, false);
                 currentState = project.currentState();
             } else {

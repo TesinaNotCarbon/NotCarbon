@@ -7,6 +7,7 @@ import {RoleManager} from "../src/RoleManager.sol";
 import {ProjectManager} from "../src/ProjectManager.sol";
 import {CarbonCreditToken} from "../src/CarbonCreditToken.sol";
 import {IProject} from "../src/interfaces/IProject.sol";
+import {ChainlinkValidationOracle} from "../src/oracles/ChainlinkValidationOracle.sol";
 
 contract Setup is Script {
     function run() external {
@@ -57,11 +58,13 @@ contract Setup is Script {
         }
 
         if (setChainlink == 1) {
+            address validationOracleAdapter = vm.envAddress("VALIDATION_ORACLE_ADAPTER");
             address linkToken = vm.envAddress("CHAINLINK_LINK_TOKEN");
             address oracle = vm.envAddress("CHAINLINK_ORACLE");
             bytes32 jobId = vm.envBytes32("CHAINLINK_JOB_ID");
             uint256 fee = vm.envUint("CHAINLINK_FEE");
-            projectManager.setChainlinkConfig(linkToken, oracle, jobId, fee);
+            projectManager.setValidationOracleAdapter(validationOracleAdapter);
+            ChainlinkValidationOracle(validationOracleAdapter).setChainlinkConfig(linkToken, oracle, jobId, fee);
             mockValidation = 0;
         }
 

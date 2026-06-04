@@ -25,7 +25,11 @@ interface IProjectManager {
 
     function setPricePerToken(uint256 _price) external;
 
-    function setChainlinkConfig(address _linkToken, address _oracle, bytes32 _jobId, uint256 _fee) external;
+    function setValidationOracleAdapter(address _adapter) external;
+
+    function validationOracleAdapter() external view returns (address);
+
+    function isValidationOracleConfigured() external view returns (bool);
 
     function getAllProjects() external view returns (address[] memory);
 

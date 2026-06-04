@@ -10,14 +10,10 @@ import {IRoleManager} from "./interfaces/IRoleManager.sol";
 import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
 import {IProjectManager} from "./interfaces/IProjectManager.sol";
 import {IProject} from "./interfaces/IProject.sol";
-import {ChainlinkClient} from "chainlink-brownie-contracts/contracts/src/v0.8/ChainlinkClient.sol";
-import {Chainlink} from "chainlink-brownie-contracts/contracts/src/v0.8/Chainlink.sol";
-import {
-    LinkTokenInterface
-} from "chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
+import {IProjectValidationOracle} from "./interfaces/IProjectValidationOracle.sol";
+import {IProjectValidationReceiver} from "./interfaces/IProjectValidationReceiver.sol";
 
-contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, IProjectManager, ChainlinkClient {
-    using Chainlink for Chainlink.Request;
+contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, IProjectManager, IProjectValidationReceiver {
 
     address public admin;
     address public upgradeController;
@@ -57,9 +53,7 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
     mapping(address => ValidationRequestInfo) private validationByProject;
     mapping(bytes32 => CellIdRecord) private cellIdRecords;
 
-    address public validationOracle;
-    bytes32 public validationJobId;
-    uint256 public validationFee;
+    address public validationOracleAdapter;
 
     event ProjectRegistered(address indexed projectAddress, string name, string description, address creator);
     event ProjectStateUpdated(address indexed projectAddress, IProject.ProjectState newState);
@@ -68,6 +62,7 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
     event ProjectValidationCompleted(
         address indexed projectAddress, bytes32 requestId, bool validated, bool overlap, bool inconclusive
     );
+    event ValidationOracleAdapterUpdated(address indexed adapter);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only the admin can execute this function.");
@@ -81,6 +76,11 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
 
     modifier onlyUpgradeController() {
         require(msg.sender == upgradeController, "Only upgrade controller.");
+        _;
+    }
+
+    modifier onlyValidationOracleAdapter() {
+        require(msg.sender == validationOracleAdapter, "Only validation oracle adapter.");
         _;
     }
 
@@ -106,6 +106,12 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
     function setUpgradeController(address _upgradeController) external onlyUpgradeController {
         require(_upgradeController != address(0), "Invalid upgrade controller.");
         upgradeController = _upgradeController;
+    }
+
+    function setValidationOracleAdapter(address _adapter) external override onlyAdmin {
+        require(_adapter != address(0), "Invalid validation oracle adapter.");
+        validationOracleAdapter = _adapter;
+        emit ValidationOracleAdapterUpdated(_adapter);
     }
 
     function registerProject(
@@ -191,19 +197,11 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
         pricePerToken = _price;
     }
 
-    function setChainlinkConfig(address _linkToken, address _oracle, bytes32 _jobId, uint256 _fee)
-        public
-        override
-        onlyAdmin
-    {
-        require(_linkToken != address(0), "Invalid LINK token.");
-        require(_oracle != address(0), "Invalid oracle.");
-        require(_jobId != bytes32(0), "Invalid job id.");
-        _setChainlinkToken(_linkToken);
-        _setChainlinkOracle(_oracle);
-        validationOracle = _oracle;
-        validationJobId = _jobId;
-        validationFee = _fee;
+    function isValidationOracleConfigured() public view override returns (bool) {
+        if (validationOracleAdapter == address(0)) {
+            return false;
+        }
+        return IProjectValidationOracle(validationOracleAdapter).isConfigured();
     }
 
     function requestProjectValidation(address _projectAddress) public override whenNotPaused returns (bytes32) {
@@ -212,12 +210,14 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
         require(project.currentState() == IProject.ProjectState.Registered, "Project must be registered.");
         ValidationRequestInfo storage requestInfo = validationByProject[_projectAddress];
         require(!validationPending[_projectAddress] && !requestInfo.pending, "Validation already pending.");
-        require(validationOracle != address(0), "Chainlink config not set.");
+        require(validationOracleAdapter != address(0), "Validation oracle not set.");
+        require(
+            IProjectValidationOracle(validationOracleAdapter).isConfigured(),
+            "Validation oracle not configured."
+        );
 
-        Chainlink.Request memory req = _buildOperatorRequest(validationJobId, this.fulfillValidation.selector);
-        req._add("cell_id", project.cellId());
-
-        bytes32 requestId = _sendOperatorRequest(req, validationFee);
+        bytes32 requestId =
+            IProjectValidationOracle(validationOracleAdapter).requestValidation(_projectAddress, project.cellId());
         validationRequests[requestId] = _projectAddress;
         lastValidationRequestId[_projectAddress] = requestId;
         validationPending[_projectAddress] = true;
@@ -229,9 +229,10 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
         return requestId;
     }
 
-    function fulfillValidation(bytes32 _requestId, bool _overlap, bool _inconclusive)
-        public
-        recordChainlinkFulfillment(_requestId)
+    function receiveValidationResult(bytes32 _requestId, bool _overlap, bool _inconclusive)
+        external
+        override
+        onlyValidationOracleAdapter
         whenNotPaused
     {
         address projectAddress = validationRequests[_requestId];
@@ -244,7 +245,7 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
         onlyAdmin
         whenNotPaused
     {
-        require(validationOracle == address(0), "Mock disabled when oracle set.");
+        require(!isValidationOracleConfigured(), "Mock disabled when oracle set.");
         require(registeredProjects[_projectAddress], "Project is not registered.");
         _applyValidationResult(_projectAddress, bytes32(0), _overlap, _inconclusive);
     }
@@ -270,12 +271,6 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
 
     function getApprovedCellIds() public view override returns (string[] memory) {
         return approvedCellIdList;
-    }
-
-    function withdrawLink(address _to, uint256 _amount) public onlyAdmin {
-        require(_to != address(0), "Invalid recipient.");
-        LinkTokenInterface link = LinkTokenInterface(_chainlinkTokenAddress());
-        require(link.transfer(_to, _amount), "LINK transfer failed.");
     }
 
     function _applyValidationResult(address _projectAddress, bytes32 _requestId, bool _overlap, bool _inconclusive)
@@ -308,5 +303,5 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
 
     function _authorizeUpgrade(address newImplementation) internal override onlyUpgradeController {}
 
-    uint256[50] private __gap;
+    uint256[52] private __gap;
 }
