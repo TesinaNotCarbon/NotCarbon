@@ -59,12 +59,24 @@ contract Setup is Script {
 
         if (setChainlink == 1) {
             address validationOracleAdapter = vm.envAddress("VALIDATION_ORACLE_ADAPTER");
-            address linkToken = vm.envAddress("CHAINLINK_LINK_TOKEN");
-            address oracle = vm.envAddress("CHAINLINK_ORACLE");
-            bytes32 jobId = vm.envBytes32("CHAINLINK_JOB_ID");
-            uint256 fee = vm.envUint("CHAINLINK_FEE");
+            address creForwarder = vm.envAddress("CRE_FORWARDER");
+            address workflowOwner = vm.envAddress("CRE_WORKFLOW_OWNER");
+            bytes10 workflowName = bytes10(vm.envBytes32("CRE_WORKFLOW_NAME"));
+            bytes2 reportName = bytes2(vm.envBytes32("CRE_REPORT_NAME"));
+
             projectManager.setValidationOracleAdapter(validationOracleAdapter);
-            ChainlinkValidationOracle(validationOracleAdapter).setChainlinkConfig(linkToken, oracle, jobId, fee);
+
+            ChainlinkValidationOracle oracle = ChainlinkValidationOracle(validationOracleAdapter);
+            ChainlinkValidationOracle.Permission[] memory permissions =
+                new ChainlinkValidationOracle.Permission[](1);
+            permissions[0] = ChainlinkValidationOracle.Permission({
+                forwarder: creForwarder,
+                workflowName: workflowName,
+                reportName: reportName,
+                workflowOwner: workflowOwner,
+                isAllowed: true
+            });
+            oracle.setReportPermissions(permissions);
             mockValidation = 0;
         }
 
@@ -97,7 +109,7 @@ contract Setup is Script {
         console2.log("PricePerToken:", pricePerToken);
         console2.log("MintAmount:", mintAmount);
         if (setChainlink == 1) {
-            console2.log("ChainlinkConfig: enabled");
+            console2.log("CREConfig: enabled");
         }
         if (setupProjects == 1) {
             console2.log("Project1:", project1Address);
