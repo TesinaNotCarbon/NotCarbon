@@ -40,7 +40,7 @@ forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadc
 - Configures roles (adds staff if provided).
 - Sets `pricePerToken`.
 - Mints tokens ensuring it covers the total tokens for the projects to be created.
-- Configures Chainlink (optional).
+- Configures CRE validation (optional).
 - Creates two projects with different states: one stays unapproved and the other advances to `Milestone1` if mock is enabled.
 
 ### Flow
@@ -49,7 +49,7 @@ forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadc
 3. Sets `pricePerToken`.
 4. If `SETUP_PROJECTS=1`, computes the minimum mint required by the sum of tokens for both projects.
 5. Mints tokens if `MINT_AMOUNT > 0`.
-6. If `SET_CHAINLINK=1`, configures the oracle and disables the mock.
+6. If `SET_CRE=1`, configures the CRE validation adapter and disables the mock.
 7. If `SETUP_PROJECTS=1`, registers two projects.
 8. If `ADVANCE_PROJECT2=1` and `MOCK_VALIDATION=1`, validates via mock and advances the second project to `Approved` and `Milestone1`.
 
@@ -75,12 +75,10 @@ forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadc
 - `ADVANCE_PROJECT2` (optional, default 1)
 - `MOCK_VALIDATION` (optional, default 1)
 
-### Chainlink environment variables
-- `SET_CHAINLINK` (optional, default 0)
-- `CHAINLINK_LINK_TOKEN`
-- `CHAINLINK_ORACLE`
-- `CHAINLINK_JOB_ID`
-- `CHAINLINK_FEE`
+### CRE validation environment variables
+- `SET_CRE` (optional, default 0)
+- `VALIDATION_ORACLE_ADAPTER`
+- `CRE_FORWARDER` (optional in setup; required when deploying the adapter)
 
 ### Preconditions and permissions
 - `setPricePerToken` requires staff or admin.
@@ -189,17 +187,17 @@ export COMPANY_MANAGER_ADDRESS=0x...
 export MARKET_ADDRESS=0x...
 ```
 
-4) Setup on Sepolia (no Chainlink):
+4) Setup on Sepolia (no CRE validation):
 
 ```bash
-export SET_CHAINLINK=0
+export SET_CRE=0
 export MOCK_VALIDATION=1
 
 forge script script/Setup.s.sol:Setup --rpc-url $SEPOLIA_RPC_URL --broadcast --slow --priority-gas-price 10000
 ```
 
 Notes:
-- To use Chainlink, set `SET_CHAINLINK=1` and fill `CHAINLINK_*`; `MOCK_VALIDATION` is automatically disabled.
+- To use CRE validation, deploy `CREValidationOracle`, set `SET_CRE=1`, and fill `VALIDATION_ORACLE_ADAPTER`; `MOCK_VALIDATION` is automatically disabled.
 - Save deploy addresses, since Sepolia does not reset like anvil.
 
 ```bash
@@ -213,5 +211,32 @@ export MOCK_VALIDATION=1
 export ADVANCE_PROJECT2=1
 
 forge script script/Setup.s.sol:Setup --rpc-url http://127.0.0.1:8545 --broadcast
+```
+
+## DeployCREValidation.s.sol
+
+### What it does
+- Deploys `CREValidationOracle`.
+- Configures it as `ProjectManager.validationOracleAdapter`.
+- Uses a CRE forwarder address for report verification.
+
+### Environment variables
+- `PRIVATE_KEY` (required)
+- `PROJECT_MANAGER_ADDRESS` (required)
+- `CRE_FORWARDER` (required)
+
+### Expected output
+- `CREValidationOracle`, `ProjectManager`, `CREForwarder`, and `Admin`.
+
+```bash
+forge script script/DeployCREValidation.s.sol:DeployCREValidation --rpc-url "$RPC_URL" --broadcast
+```
+
+After the CRE workflow is deployed, configure the receiver with the workflow id if desired:
+
+```bash
+cast send "$VALIDATION_ORACLE_ADAPTER" "setExpectedWorkflowId(bytes32)" "$CRE_WORKFLOW_ID" \
+  --private-key "$PRIVATE_KEY" \
+  --rpc-url "$RPC_URL"
 ```
 

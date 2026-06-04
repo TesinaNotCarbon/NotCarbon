@@ -7,7 +7,7 @@ import {RoleManager} from "../src/RoleManager.sol";
 import {ProjectManager} from "../src/ProjectManager.sol";
 import {CarbonCreditToken} from "../src/CarbonCreditToken.sol";
 import {IProject} from "../src/interfaces/IProject.sol";
-import {ChainlinkValidationOracle} from "../src/oracles/ChainlinkValidationOracle.sol";
+import {CREValidationOracle} from "../src/oracles/CREValidationOracle.sol";
 
 contract Setup is Script {
     function run() external {
@@ -19,7 +19,7 @@ contract Setup is Script {
         address staffAddress = vm.envOr("STAFF_ADDRESS", address(0));
         uint256 pricePerToken = vm.envOr("PRICE_PER_TOKEN", uint256(10));
         uint256 mintAmount = vm.envOr("MINT_AMOUNT", uint256(10000));
-        uint256 setChainlink = vm.envOr("SET_CHAINLINK", uint256(0));
+        uint256 setCre = vm.envOr("SET_CRE", uint256(0));
         uint256 setupProjects = vm.envOr("SETUP_PROJECTS", uint256(1));
         uint256 mockValidation = vm.envOr("MOCK_VALIDATION", uint256(1));
         uint256 advanceProject2 = vm.envOr("ADVANCE_PROJECT2", uint256(1));
@@ -57,14 +57,13 @@ contract Setup is Script {
             token.mint(mintAmount);
         }
 
-        if (setChainlink == 1) {
+        if (setCre == 1) {
             address validationOracleAdapter = vm.envAddress("VALIDATION_ORACLE_ADAPTER");
-            address linkToken = vm.envAddress("CHAINLINK_LINK_TOKEN");
-            address oracle = vm.envAddress("CHAINLINK_ORACLE");
-            bytes32 jobId = vm.envBytes32("CHAINLINK_JOB_ID");
-            uint256 fee = vm.envUint("CHAINLINK_FEE");
+            address creForwarder = vm.envOr("CRE_FORWARDER", address(0));
             projectManager.setValidationOracleAdapter(validationOracleAdapter);
-            ChainlinkValidationOracle(validationOracleAdapter).setChainlinkConfig(linkToken, oracle, jobId, fee);
+            if (creForwarder != address(0)) {
+                CREValidationOracle(validationOracleAdapter).setForwarderAddress(creForwarder);
+            }
             mockValidation = 0;
         }
 
@@ -96,8 +95,8 @@ contract Setup is Script {
         }
         console2.log("PricePerToken:", pricePerToken);
         console2.log("MintAmount:", mintAmount);
-        if (setChainlink == 1) {
-            console2.log("ChainlinkConfig: enabled");
+        if (setCre == 1) {
+            console2.log("CREValidation: enabled");
         }
         if (setupProjects == 1) {
             console2.log("Project1:", project1Address);

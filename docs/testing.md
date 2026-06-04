@@ -42,14 +42,12 @@ MINT_AMOUNT=10000
 STAFF_ADDRESS=0xstaff_address
 ```
 
-Optional (chainlink setup on Sepolia):
+Optional (CRE validation setup on Sepolia):
 
 ```
-SET_CHAINLINK=1
-CHAINLINK_LINK_TOKEN=0xlink_token
-CHAINLINK_ORACLE=0xoracle
-CHAINLINK_JOB_ID=0xjobid
-CHAINLINK_FEE=100000000000000000
+SET_CRE=1
+VALIDATION_ORACLE_ADAPTER=0xcre_validation_oracle
+CRE_FORWARDER=0xkeystone_forwarder
 ```
 
 Optional (smoke test overrides):
@@ -138,10 +136,11 @@ forge script script/SmokeTest.s.sol:SmokeTest \
   --broadcast
 ```
 
-### Chainlink validation notes
+### CRE validation notes
 
-- If `CHAINLINK_ORACLE` is configured, the smoke test will request validation and then stop.
-- After the oracle fulfills, re-run the smoke test with `PROJECT_ADDRESS` to continue the state progression.
+- If a CRE validation adapter is configured, the smoke test will request validation, print the HTTP trigger payload, and then stop.
+- Send that payload to the deployed CRE HTTP trigger. The workflow calls `POST /validate-polygon`, writes the report to `CREValidationOracle`, and `ProjectManager` applies the result.
+- After the CRE report is written onchain, re-run the smoke test with `PROJECT_ADDRESS` to continue the state progression.
 
 ## Tips to avoid re-deploying
 

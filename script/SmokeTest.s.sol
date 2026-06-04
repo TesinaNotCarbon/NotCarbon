@@ -59,6 +59,18 @@ contract SmokeTest is Script {
                 console2.log("Validation requested:");
                 console2.logBytes32(requestId);
                 console2.log("Project address:", projectAddress);
+                console2.log("CRE HTTP payload:");
+                console2.log(
+                    string.concat(
+                        '{"request_id":"',
+                        vm.toString(requestId),
+                        '","project_address":"',
+                        vm.toString(projectAddress),
+                        '","cell_id":"',
+                        project.cellId(),
+                        '"}'
+                    )
+                );
                 vm.stopBroadcast();
                 return;
             }
