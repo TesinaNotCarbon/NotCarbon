@@ -14,7 +14,6 @@ import {IProjectValidationOracle} from "./interfaces/IProjectValidationOracle.so
 import {IProjectValidationReceiver} from "./interfaces/IProjectValidationReceiver.sol";
 
 contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, IProjectManager, IProjectValidationReceiver {
-
     address public admin;
     address public upgradeController;
     mapping(address => bool) public registeredProjects;

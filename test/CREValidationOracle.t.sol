@@ -94,9 +94,27 @@ contract CREValidationOracleTest is BaseTest {
         Project project = _registerProject(creator, "Solar", "Solar farm", 200);
         bytes32 requestId = projectManager.requestProjectValidation(address(project));
 
+        address forwarder = validationOracle.getForwarderAddress();
+
         vm.prank(outsider);
-        vm.expectRevert(ReceiverTemplate.UnauthorizedForwarder.selector);
+        vm.expectRevert(abi.encodeWithSelector(ReceiverTemplate.UnauthorizedForwarder.selector, outsider, forwarder));
         validationOracle.onReport("", abi.encode(requestId, false, false));
+    }
+
+    function test_onReport_revertsWhenExpectedWorkflowConfiguredAndMetadataMissing() public {
+        _bootstrapPriceAndMint(1 ether, 1000);
+        Project project = _registerProject(creator, "Solar", "Solar farm", 200);
+        bytes32 requestId = projectManager.requestProjectValidation(address(project));
+
+        validationOracle.setExpectedWorkflowId(bytes32("workflow"));
+
+        vm.expectRevert(ReceiverTemplate.MissingReportMetadata.selector);
+        validationOracle.onReport("", abi.encode(requestId, false, false));
+    }
+
+    function test_setForwarderAddress_revertsForZeroAddress() public {
+        vm.expectRevert(ReceiverTemplate.InvalidForwarderAddress.selector);
+        validationOracle.setForwarderAddress(address(0));
     }
 
     function test_mockValidationStillWorksWithoutConfiguredAdapter() public {

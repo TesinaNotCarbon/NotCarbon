@@ -19,6 +19,7 @@ abstract contract ReceiverTemplate is IReceiver, ERC165, Ownable {
     error UnauthorizedForwarder(address caller, address expectedForwarder);
     error UnexpectedWorkflowId(bytes32 workflowId, bytes32 expectedWorkflowId);
     error UnexpectedAuthor(address author, address expectedAuthor);
+    error MissingReportMetadata();
 
     constructor(address _forwarderAddress) Ownable(msg.sender) {
         if (_forwarderAddress == address(0)) {
@@ -40,6 +41,9 @@ abstract contract ReceiverTemplate is IReceiver, ERC165, Ownable {
     }
 
     function setForwarderAddress(address _forwarderAddress) external onlyOwner {
+        if (_forwarderAddress == address(0)) {
+            revert InvalidForwarderAddress();
+        }
         address previousForwarder = forwarderAddress;
         forwarderAddress = _forwarderAddress;
         emit ForwarderAddressUpdated(previousForwarder, _forwarderAddress);
@@ -63,10 +67,12 @@ abstract contract ReceiverTemplate is IReceiver, ERC165, Ownable {
             revert UnauthorizedForwarder(msg.sender, currentForwarder);
         }
 
+        bytes32 configuredWorkflowId = expectedWorkflowId;
+        address configuredAuthor = expectedAuthor;
+        bool requiresMetadata = configuredWorkflowId != bytes32(0) || configuredAuthor != address(0);
+
         if (metadata.length >= 62) {
             (bytes32 workflowId, address author) = _decodeMetadata(metadata);
-            bytes32 configuredWorkflowId = expectedWorkflowId;
-            address configuredAuthor = expectedAuthor;
 
             if (configuredWorkflowId != bytes32(0) && workflowId != configuredWorkflowId) {
                 revert UnexpectedWorkflowId(workflowId, configuredWorkflowId);
@@ -74,6 +80,8 @@ abstract contract ReceiverTemplate is IReceiver, ERC165, Ownable {
             if (configuredAuthor != address(0) && author != configuredAuthor) {
                 revert UnexpectedAuthor(author, configuredAuthor);
             }
+        } else if (requiresMetadata) {
+            revert MissingReportMetadata();
         }
 
         _processReport(report);

@@ -142,6 +142,80 @@ forge script script/SmokeTest.s.sol:SmokeTest \
 - Send that payload to the deployed CRE HTTP trigger. The workflow calls `POST /validate-polygon`, writes the report to `CREValidationOracle`, and `ProjectManager` applies the result.
 - After the CRE report is written onchain, re-run the smoke test with `PROJECT_ADDRESS` to continue the state progression.
 
+### Deploying the Chainlink CRE workflow
+
+Use the official Chainlink CRE documentation for the current CLI install, environment setup, network support, forwarder addresses, workflow deployment command, and HTTP trigger invocation. The repository workflow code lives in `cre/validation-workflow/` and is designed to be deployed with that process.
+
+Recommended flow:
+
+1. Deploy the core contracts and `CREValidationOracle` first. `CREValidationOracle` must be deployed with the official CRE forwarder for the target network:
+
+```
+export PROJECT_MANAGER_ADDRESS=0xproject_manager
+export CRE_FORWARDER=0xofficial_cre_forwarder
+
+forge script script/DeployCREValidation.s.sol:DeployCREValidation \
+  --rpc-url "$RPC_URL" \
+  --broadcast
+```
+
+2. Edit `cre/validation-workflow/config.json` using the values from your deployment:
+
+```
+{
+  "httpPublicKey": "0xauthorized_trigger_address",
+  "validationApiBaseUrl": "https://your-validation-api.example.com",
+  "receiverAddress": "0xCREValidationOracle",
+  "chainSelector": "16015286601757825753",
+  "gasLimit": "500000"
+}
+```
+
+For Sepolia, `chainSelector` is `16015286601757825753`. Confirm this and the forwarder address against the Chainlink docs before deploying.
+
+3. Install and check the workflow locally:
+
+```
+cd cre/validation-workflow
+npm install
+npm run typecheck
+npm run simulate
+```
+
+4. Deploy the workflow using the Chainlink CRE docs/CLI. After deployment, save the workflow id and, if provided by the CLI, the workflow author address.
+
+5. Lock the onchain receiver to the deployed workflow before real testing:
+
+```
+cast send "$VALIDATION_ORACLE_ADAPTER" \
+  "setExpectedWorkflowId(bytes32)" "$CRE_WORKFLOW_ID" \
+  --private-key "$PRIVATE_KEY" \
+  --rpc-url "$RPC_URL"
+
+cast send "$VALIDATION_ORACLE_ADAPTER" \
+  "setExpectedAuthor(address)" "$CRE_AUTHOR" \
+  --private-key "$PRIVATE_KEY" \
+  --rpc-url "$RPC_URL"
+```
+
+6. Trigger validation by calling `ProjectManager.requestProjectValidation(project)`, then send the emitted request data to the deployed CRE HTTP trigger:
+
+```
+{
+  "request_id": "0x...",
+  "project_address": "0x...",
+  "cell_id": "CELL-001"
+}
+```
+
+7. Verify the result onchain:
+
+```
+cast call "$PROJECT_MANAGER_ADDRESS" \
+  "getValidationStatus(address)(bool,bool,bool,uint256)" "$PROJECT_ADDRESS" \
+  --rpc-url "$RPC_URL"
+```
+
 ## Tips to avoid re-deploying
 
 - Store addresses from the deploy logs in a JSON file and reuse them with `ROLE_MANAGER_ADDRESS`, `PROJECT_MANAGER_ADDRESS`, `TOKEN_ADDRESS`, `MARKET_ADDRESS` env vars in scripts.
