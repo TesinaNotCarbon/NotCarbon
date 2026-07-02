@@ -20,14 +20,17 @@ This repository is configured to use Foundry for build, test, scripting, and dep
 1. Solidity 0.8.x
 2. Foundry (forge, cast, anvil)
 3. OpenZeppelin Contracts
+4. Chainlink CRE SDK and CRE receiver pattern
 
 ## Project Structure
 
 1. src/: core contracts.
 2. src/interfaces/: shared interfaces.
 3. script/Deploy.s.sol: main Foundry deployment script.
-4. test/: Foundry unit tests.
-5. script/deploy.py and script/project.py: legacy Brownie scripts (kept for reference).
+4. script/DeployCREValidation.s.sol: CRE validation adapter deployment script.
+5. cre/validation-workflow/: Chainlink CRE HTTP workflow for polygon validation.
+6. test/: Foundry unit tests.
+7. script/deploy.py and script/project.py: legacy Brownie scripts (kept for reference).
 
 ## Prerequisites
 

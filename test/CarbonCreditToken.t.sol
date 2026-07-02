@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {Test} from "forge-std/Test.sol";
 import {RoleManager} from "../src/RoleManager.sol";
 import {CarbonCreditToken} from "../src/CarbonCreditToken.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract CarbonCreditTokenTest is Test {
     RoleManager internal roleManager;
@@ -19,8 +20,27 @@ contract CarbonCreditTokenTest is Test {
     event TokensMinted(address indexed to, uint256 amount);
 
     function setUp() public {
-        roleManager = new RoleManager();
-        token = new CarbonCreditToken(projectManager, address(roleManager));
+        RoleManager roleManagerImpl = new RoleManager();
+        roleManager = RoleManager(
+            address(
+                new ERC1967Proxy(
+                    address(roleManagerImpl), abi.encodeCall(RoleManager.initialize, (address(this), address(this)))
+                )
+            )
+        );
+
+        CarbonCreditToken tokenImpl = new CarbonCreditToken();
+        token = CarbonCreditToken(
+            address(
+                new ERC1967Proxy(
+                    address(tokenImpl),
+                    abi.encodeCall(
+                        CarbonCreditToken.initialize,
+                        (projectManager, address(roleManager), address(this), address(this))
+                    )
+                )
+            )
+        );
     }
 
     function test_constructor_setsCoreValues() public view {

@@ -13,6 +13,9 @@ lcov.info
 # Logs
 *.log
 
+# Node/CRE workflow dependencies
+node_modules/
+
 # Secrets and env files
 .env
 .env.*

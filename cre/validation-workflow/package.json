@@ -1,0 +1,17 @@
+{
+  "name": "notcarbon-validation-workflow",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "simulate": "cre workflow simulate --payload fixtures/request.valid.json",
+    "simulate:overlap": "cre workflow simulate --payload fixtures/request.overlap.json",
+    "simulate:inconclusive": "cre workflow simulate --payload fixtures/request.inconclusive.json"
+  },
+  "dependencies": {
+    "@chainlink/cre-sdk": "1.10.0",
+    "typescript": "5.9.3",
+    "viem": "2.34.0"
+  }
+}

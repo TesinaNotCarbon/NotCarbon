@@ -1,0 +1,4 @@
+name: notcarbon_validation
+owner: "0x0000000000000000000000000000000000000000"
+target: testnet
+config: config.json

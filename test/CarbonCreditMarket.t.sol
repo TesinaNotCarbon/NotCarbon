@@ -6,6 +6,7 @@ import {CarbonCreditMarket} from "../src/CarbonCreditMarket.sol";
 import {IProject} from "../src/interfaces/IProject.sol";
 import {IProjectManager} from "../src/interfaces/IProjectManager.sol";
 import {ICompanyManager} from "../src/interfaces/ICompanyManager.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract MockMarketProject is IProject {
     uint256 public available;
@@ -90,7 +91,15 @@ contract MockMarketProject is IProject {
 
         function setPricePerToken(uint256) external pure override {}
 
-        function setChainlinkConfig(address, address, bytes32, uint256) external pure override {}
+        function setValidationOracleAdapter(address) external pure override {}
+
+        function validationOracleAdapter() external pure override returns (address) {
+            return address(0);
+        }
+
+        function isValidationOracleConfigured() external pure override returns (bool) {
+            return false;
+        }
 
         function getAllProjects() external view override returns (address[] memory) {
             return projects;
@@ -142,7 +151,18 @@ contract MockMarketProject is IProject {
         function setUp() public {
             projectManager = new MockMarketProjectManager();
             companyManager = new MockMarketCompanyManager();
-            market = new CarbonCreditMarket(address(projectManager), address(companyManager));
+            CarbonCreditMarket marketImpl = new CarbonCreditMarket();
+            market = CarbonCreditMarket(
+                address(
+                    new ERC1967Proxy(
+                        address(marketImpl),
+                        abi.encodeCall(
+                            CarbonCreditMarket.initialize,
+                            (address(projectManager), address(companyManager), address(this))
+                        )
+                    )
+                )
+            );
 
             vm.deal(payer, 100 ether);
             vm.deal(buyer, 10 ether);

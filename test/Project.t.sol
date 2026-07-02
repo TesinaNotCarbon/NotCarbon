@@ -7,6 +7,7 @@ import {CompanyManager} from "../src/CompanyManager.sol";
 import {CarbonCreditToken} from "../src/CarbonCreditToken.sol";
 import {Project} from "../src/Project.sol";
 import {IProject} from "../src/interfaces/IProject.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract ProjectTest is Test {
     RoleManager internal roleManager;
@@ -24,9 +25,37 @@ contract ProjectTest is Test {
     event ETHWithdrawn(address indexed to, uint256 amount);
 
     function setUp() public {
-        roleManager = new RoleManager();
-        companyManager = new CompanyManager(address(roleManager));
-        token = new CarbonCreditToken(address(this), address(roleManager));
+        RoleManager roleManagerImpl = new RoleManager();
+        roleManager = RoleManager(
+            address(
+                new ERC1967Proxy(
+                    address(roleManagerImpl), abi.encodeCall(RoleManager.initialize, (address(this), address(this)))
+                )
+            )
+        );
+
+        CompanyManager companyManagerImpl = new CompanyManager();
+        companyManager = CompanyManager(
+            address(
+                new ERC1967Proxy(
+                    address(companyManagerImpl),
+                    abi.encodeCall(CompanyManager.initialize, (address(roleManager), address(this)))
+                )
+            )
+        );
+
+        CarbonCreditToken tokenImpl = new CarbonCreditToken();
+        token = CarbonCreditToken(
+            address(
+                new ERC1967Proxy(
+                    address(tokenImpl),
+                    abi.encodeCall(
+                        CarbonCreditToken.initialize,
+                        (address(this), address(roleManager), address(this), address(this))
+                    )
+                )
+            )
+        );
         project = new Project(
             "Forest", "Restore native forest", address(token), 1000, creator, 1 ether, companyManager, "CELL-001"
         );
