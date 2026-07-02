@@ -13,7 +13,13 @@ import {IProject} from "./interfaces/IProject.sol";
 import {IProjectValidationOracle} from "./interfaces/IProjectValidationOracle.sol";
 import {IProjectValidationReceiver} from "./interfaces/IProjectValidationReceiver.sol";
 
-contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, IProjectManager, IProjectValidationReceiver {
+contract ProjectManager is
+    Initializable,
+    PausableUpgradeable,
+    UUPSUpgradeable,
+    IProjectManager,
+    IProjectValidationReceiver
+{
     address public admin;
     address public upgradeController;
     mapping(address => bool) public registeredProjects;
@@ -210,10 +216,7 @@ contract ProjectManager is Initializable, PausableUpgradeable, UUPSUpgradeable, 
         ValidationRequestInfo storage requestInfo = validationByProject[_projectAddress];
         require(!validationPending[_projectAddress] && !requestInfo.pending, "Validation already pending.");
         require(validationOracleAdapter != address(0), "Validation oracle not set.");
-        require(
-            IProjectValidationOracle(validationOracleAdapter).isConfigured(),
-            "Validation oracle not configured."
-        );
+        require(IProjectValidationOracle(validationOracleAdapter).isConfigured(), "Validation oracle not configured.");
 
         bytes32 requestId =
             IProjectValidationOracle(validationOracleAdapter).requestValidation(_projectAddress, project.cellId());

@@ -15,8 +15,7 @@ contract DeployCREValidation is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        CREValidationOracle validationOracle =
-            new CREValidationOracle(projectManagerAddress, deployer, forwarder);
+        CREValidationOracle validationOracle = new CREValidationOracle(projectManagerAddress, deployer, forwarder);
         ProjectManager(projectManagerAddress).setValidationOracleAdapter(address(validationOracle));
 
         vm.stopBroadcast();

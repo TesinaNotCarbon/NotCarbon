@@ -49,8 +49,7 @@ contract SmokeTest is Script {
 
         if (uint256(currentState) < uint256(IProject.ProjectState.Validated)) {
             address adapter = projectManager.validationOracleAdapter();
-            bool oracleConfigured =
-                adapter != address(0) && IProjectValidationOracle(adapter).isConfigured();
+            bool oracleConfigured = adapter != address(0) && IProjectValidationOracle(adapter).isConfigured();
             if (!oracleConfigured) {
                 projectManager.mockValidationResult(projectAddress, false, false);
                 currentState = project.currentState();
