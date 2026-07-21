@@ -302,21 +302,14 @@ contract ProjectManager is
         require(_measurementDate != 0, "Invalid measurement date.");
 
         ProjectScoring memory scoring = ProjectScoring({
-            measurementDate: _measurementDate,
-            scoring: _scoring,
-            fraudScoring: _fraudScoring,
-            storedAt: block.timestamp
+            measurementDate: _measurementDate, scoring: _scoring, fraudScoring: _fraudScoring, storedAt: block.timestamp
         });
         projectScoringHistory[_projectAddress].push(scoring);
 
         emit ProjectScoringStored(_projectAddress, _measurementDate, _scoring, _fraudScoring, block.timestamp);
     }
 
-    function getProjectScoringHistory(address _projectAddress)
-        external
-        view
-        returns (ProjectScoring[] memory)
-    {
+    function getProjectScoringHistory(address _projectAddress) external view returns (ProjectScoring[] memory) {
         require(registeredProjects[_projectAddress], "Project is not registered.");
         return projectScoringHistory[_projectAddress];
     }
