@@ -136,11 +136,13 @@ forge script script/SmokeTest.s.sol:SmokeTest \
   --broadcast
 ```
 
-### CRE validation notes
+### CRE validation and scoring notes
 
 - If a CRE validation adapter is configured, the smoke test will request validation, print the HTTP trigger payload, and then stop.
 - Send that payload to the deployed CRE HTTP trigger. The workflow calls `POST /validate-polygon`, writes the report to `CREValidationOracle`, and `ProjectManager` applies the result.
-- After the CRE report is written onchain, re-run the smoke test with `PROJECT_ADDRESS` to continue the state progression.
+- After the CRE validation report is written onchain, re-run the smoke test with `PROJECT_ADDRESS` to continue the state progression.
+- Project scoring uses a separate `CREScoringOracle` adapter. The scoring workflow is intended to be triggered from the frontend/backend with a project identifier; CRE calls the scoring API and writes `(projectAddress, measurementDate, scoring, fraudScoring)` to `CREScoringOracle`.
+- Historic scoring data can be verified with `ProjectManager.getProjectScoringHistory`, or paged with `getProjectScoringCount` and `getProjectScoringAt`.
 
 ### Deploying the Chainlink CRE workflow
 
@@ -208,11 +210,33 @@ cast send "$VALIDATION_ORACLE_ADAPTER" \
 }
 ```
 
-7. Verify the result onchain:
+7. Verify the validation result onchain:
 
 ```
 cast call "$PROJECT_MANAGER_ADDRESS" \
   "getValidationStatus(address)(bool,bool,bool,uint256)" "$PROJECT_ADDRESS" \
+  --rpc-url "$RPC_URL"
+```
+
+8. For scoring, deploy `CREScoringOracle` with the same official CRE forwarder, configure it through `ProjectManager.setScoringOracleAdapter`, and lock it to the scoring workflow id/author if desired. The scoring report payload must ABI-encode:
+
+```
+(address projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)
+```
+
+The workflow can resolve a project's cell id before calling the scoring API with:
+
+```
+cast call "$PROJECT_MANAGER_ADDRESS" \
+  "getProjectCellId(address)(string)" "$PROJECT_ADDRESS" \
+  --rpc-url "$RPC_URL"
+```
+
+Verify stored scoring data with:
+
+```
+cast call "$PROJECT_MANAGER_ADDRESS" \
+  "getProjectScoringAt(address,uint256)(uint256,uint256,uint256,uint256)" "$PROJECT_ADDRESS" 0 \
   --rpc-url "$RPC_URL"
 ```
 
