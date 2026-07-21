@@ -12,13 +12,15 @@ import {IProjectManager} from "./interfaces/IProjectManager.sol";
 import {IProject} from "./interfaces/IProject.sol";
 import {IProjectValidationOracle} from "./interfaces/IProjectValidationOracle.sol";
 import {IProjectValidationReceiver} from "./interfaces/IProjectValidationReceiver.sol";
+import {IProjectScoringReceiver} from "./interfaces/IProjectScoringReceiver.sol";
 
 contract ProjectManager is
     Initializable,
     PausableUpgradeable,
     UUPSUpgradeable,
     IProjectManager,
-    IProjectValidationReceiver
+    IProjectValidationReceiver,
+    IProjectScoringReceiver
 {
     address public admin;
     address public upgradeController;
@@ -51,14 +53,23 @@ contract ProjectManager is
         bool projectApprovalRecorded;
     }
 
+    struct ProjectScoring {
+        uint256 measurementDate;
+        uint256 scoring;
+        uint256 fraudScoring;
+        uint256 storedAt;
+    }
+
     mapping(address => ValidationStatus) private validationStatus;
     mapping(bytes32 => address) public validationRequests;
     mapping(address => bool) public validationPending;
     mapping(address => bytes32) public lastValidationRequestId;
     mapping(address => ValidationRequestInfo) private validationByProject;
     mapping(bytes32 => CellIdRecord) private cellIdRecords;
+    mapping(address => ProjectScoring[]) private projectScoringHistory;
 
     address public validationOracleAdapter;
+    address public scoringOracleAdapter;
 
     event ProjectRegistered(address indexed projectAddress, string name, string description, address creator);
     event ProjectStateUpdated(address indexed projectAddress, IProject.ProjectState newState);
@@ -68,6 +79,10 @@ contract ProjectManager is
         address indexed projectAddress, bytes32 requestId, bool validated, bool overlap, bool inconclusive
     );
     event ValidationOracleAdapterUpdated(address indexed adapter);
+    event ScoringOracleAdapterUpdated(address indexed adapter);
+    event ProjectScoringStored(
+        address indexed projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring, uint256 storedAt
+    );
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only the admin can execute this function.");
@@ -86,6 +101,11 @@ contract ProjectManager is
 
     modifier onlyValidationOracleAdapter() {
         require(msg.sender == validationOracleAdapter, "Only validation oracle adapter.");
+        _;
+    }
+
+    modifier onlyScoringOracleAdapter() {
+        require(msg.sender == scoringOracleAdapter, "Only scoring oracle adapter.");
         _;
     }
 
@@ -117,6 +137,12 @@ contract ProjectManager is
         require(_adapter != address(0), "Invalid validation oracle adapter.");
         validationOracleAdapter = _adapter;
         emit ValidationOracleAdapterUpdated(_adapter);
+    }
+
+    function setScoringOracleAdapter(address _adapter) external onlyAdmin {
+        require(_adapter != address(0), "Invalid scoring oracle adapter.");
+        scoringOracleAdapter = _adapter;
+        emit ScoringOracleAdapterUpdated(_adapter);
     }
 
     function registerProject(
@@ -266,6 +292,55 @@ contract ProjectManager is
         return (status.validated, status.overlap, status.inconclusive, status.updatedAt);
     }
 
+    function receiveProjectScoring(
+        address _projectAddress,
+        uint256 _measurementDate,
+        uint256 _scoring,
+        uint256 _fraudScoring
+    ) external override(IProjectScoringReceiver) onlyScoringOracleAdapter whenNotPaused {
+        require(registeredProjects[_projectAddress], "Project is not registered.");
+        require(_measurementDate != 0, "Invalid measurement date.");
+
+        ProjectScoring memory scoring = ProjectScoring({
+            measurementDate: _measurementDate,
+            scoring: _scoring,
+            fraudScoring: _fraudScoring,
+            storedAt: block.timestamp
+        });
+        projectScoringHistory[_projectAddress].push(scoring);
+
+        emit ProjectScoringStored(_projectAddress, _measurementDate, _scoring, _fraudScoring, block.timestamp);
+    }
+
+    function getProjectScoringHistory(address _projectAddress)
+        external
+        view
+        returns (ProjectScoring[] memory)
+    {
+        require(registeredProjects[_projectAddress], "Project is not registered.");
+        return projectScoringHistory[_projectAddress];
+    }
+
+    function getProjectScoringCount(address _projectAddress) external view returns (uint256) {
+        require(registeredProjects[_projectAddress], "Project is not registered.");
+        return projectScoringHistory[_projectAddress].length;
+    }
+
+    function getProjectScoringAt(address _projectAddress, uint256 _index)
+        external
+        view
+        returns (uint256 measurementDate, uint256 scoring, uint256 fraudScoring, uint256 storedAt)
+    {
+        require(registeredProjects[_projectAddress], "Project is not registered.");
+        ProjectScoring memory item = projectScoringHistory[_projectAddress][_index];
+        return (item.measurementDate, item.scoring, item.fraudScoring, item.storedAt);
+    }
+
+    function getProjectCellId(address _projectAddress) external view returns (string memory) {
+        require(registeredProjects[_projectAddress], "Project is not registered.");
+        return IProject(_projectAddress).cellId();
+    }
+
     function isApprovedCellId(string memory _cellId) public view override returns (bool) {
         bytes32 cellIdHash = keccak256(bytes(_cellId));
         return approvedCellIds[cellIdHash] || cellIdRecords[cellIdHash].approved;
@@ -305,5 +380,5 @@ contract ProjectManager is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyUpgradeController {}
 
-    uint256[52] private __gap;
+    uint256[47] private __gap;
 }

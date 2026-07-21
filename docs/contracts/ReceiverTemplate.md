@@ -2,7 +2,7 @@
 
 ## Summary
 
-`ReceiverTemplate` is an abstract base contract for receiving Chainlink CRE reports. It verifies that reports come from a trusted forwarder, optionally checks workflow metadata, and delegates application-specific report decoding to an internal abstract function. `CREValidationOracle` extends this template to process validation results.
+`ReceiverTemplate` is an abstract base contract for receiving Chainlink CRE reports. It verifies that reports come from a trusted forwarder, optionally checks workflow metadata, and delegates application-specific report decoding to an internal abstract function. `CREValidationOracle` extends this template to process validation results, and `CREScoringOracle` extends it to process scoring results.
 
 ## Interface
 
@@ -19,4 +19,4 @@
 
 ## Implementation details
 
-The template inherits `IReceiver`, `ERC165`, and `Ownable`. It stores `forwarderAddress`, `expectedWorkflowId`, and `expectedAuthor`. `onReport` first checks `msg.sender` against the configured forwarder and reverts with custom errors for unauthorized callers. If either expected workflow id or expected author is configured, metadata must be present and must match. Metadata decoding uses inline assembly to extract a `bytes32` workflow id and an address author efficiently from calldata. After these generic security checks, the template calls `_processReport(report)`, leaving payload interpretation to the child contract. This separates CRE transport/security concerns from application-specific report logic. The contract uses custom errors such as `InvalidForwarderAddress`, `UnauthorizedForwarder`, `UnexpectedWorkflowId`, `UnexpectedAuthor`, and `MissingReportMetadata`, which are cheaper than long revert strings.
+The template inherits `IReceiver`, `ERC165`, and `Ownable`. It stores `forwarderAddress`, `expectedWorkflowId`, and `expectedAuthor`. `onReport` first checks `msg.sender` against the configured forwarder and reverts with custom errors for unauthorized callers. If either expected workflow id or expected author is configured, metadata must be present and must match. Metadata decoding uses inline assembly to extract a `bytes32` workflow id and an address author efficiently from calldata. After these generic security checks, the template calls `_processReport(report)`, leaving payload interpretation to the child contract. This separates CRE transport/security concerns from application-specific report logic, such as validation reports or project scoring reports. The contract uses custom errors such as `InvalidForwarderAddress`, `UnauthorizedForwarder`, `UnexpectedWorkflowId`, `UnexpectedAuthor`, and `MissingReportMetadata`, which are cheaper than long revert strings.

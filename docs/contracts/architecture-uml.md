@@ -63,6 +63,7 @@ classDiagram
         +IRoleManager roleManager
         +ICompanyManager companyManager
         +address validationOracleAdapter
+        +address scoringOracleAdapter
         +mapping registeredProjects
         +mapping usedCellIds
         +mapping approvedCellIds
@@ -72,9 +73,13 @@ classDiagram
         +updateProjectStatus(project, newState)
         +requestProjectValidation(project) bytes32
         +receiveValidationResult(requestId, overlap, inconclusive)
+        +receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
         +mockValidationResult(project, overlap, inconclusive)
         +setPricePerToken(price)
         +setValidationOracleAdapter(adapter)
+        +setScoringOracleAdapter(adapter)
+        +getProjectScoringHistory(project) ProjectScoring[]
+        +getProjectCellId(project) string
         +getAllProjects() address[]
     }
 
@@ -131,6 +136,14 @@ classDiagram
         #_processReport(report)
     }
 
+    class CREScoringOracle {
+        +address admin
+        +address receiver
+        +setReceiver(receiver)
+        +isConfigured() bool
+        #_processReport(report)
+    }
+
     class ChainlinkForwarder {
         <<external>>
         +onReport(metadata, report)
@@ -149,6 +162,7 @@ classDiagram
     ProjectManager --> CarbonCreditToken : transferTokens to project
     ProjectManager --> CREValidationOracle : requestValidation
     ProjectManager <.. CREValidationOracle : receiveValidationResult
+    ProjectManager <.. CREScoringOracle : receiveProjectScoring
     ProjectManager <.. CarbonCreditMarket : getAllProjects
 
     Project --> CarbonCreditToken : transfer CCT to buyer
@@ -160,6 +174,7 @@ classDiagram
     CarbonCreditMarket --> Project : buyFor buyer
 
     CREValidationOracle --|> ReceiverTemplate : extends
+    CREScoringOracle --|> ReceiverTemplate : extends
     ChainlinkForwarder --> ReceiverTemplate : calls onReport
 ```
 
@@ -179,6 +194,7 @@ sequenceDiagram
     participant PM as ProjectManager
     participant P as Project
     participant Oracle as CREValidationOracle
+    participant ScoringOracle as CREScoringOracle
     participant CL as Chainlink CRE Forwarder
     participant Market as CarbonCreditMarket
 
@@ -213,6 +229,11 @@ sequenceDiagram
     Staff->>PM: updateProjectStatus(project, Approved)
     PM->>P: updateState(Approved)
     PM-->>PM: record approved cellId
+
+    CompanyOwner->>ScoringOracle: Trigger CRE scoring workflow off-chain
+    CL->>ScoringOracle: onReport(metadata, abi.encode(project, measurementDate, scoring, fraudScoring))
+    ScoringOracle->>PM: receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
+    PM-->>PM: append scoring history
 
     CompanyOwner->>Co: buyFromMarket(market, amount) + ETH
     Co->>Market: buyFromAny(amount, company) + ETH
@@ -249,6 +270,26 @@ sequenceDiagram
     P->>CCT: transfer(msg.sender, amount)
     P-->>Co: Refund excess ETH
     Co-->>Co: carbonCredits += amount
+```
+
+## Scoring callback sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Frontend
+    participant CRE as Chainlink CRE Workflow
+    participant API as Scoring API
+    participant Oracle as CREScoringOracle
+    participant PM as ProjectManager
+
+    Frontend->>CRE: HTTP trigger(projectAddress)
+    CRE->>PM: getProjectCellId(projectAddress) / optional read
+    CRE->>API: Request scoring data(project id/address)
+    API-->>CRE: measurementDate, scoring, fraudScoring
+    CRE->>Oracle: onReport(abi.encode(projectAddress, measurementDate, scoring, fraudScoring))
+    Oracle->>PM: receiveProjectScoring(projectAddress, measurementDate, scoring, fraudScoring)
+    PM-->>PM: Append scoring history
 ```
 
 ## Validation callback sequence
@@ -314,6 +355,7 @@ classDiagram
         +updateProjectStatus(project, newState)
         +requestProjectValidation(project) bytes32
         +receiveValidationResult(requestId, overlap, inconclusive)
+        +receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
     }
 
     class Project {
@@ -351,6 +393,7 @@ sequenceDiagram
     participant PM as ProjectManager
     participant P as Project
     participant Oracle as CREValidationOracle
+    participant ScoringOracle as CREScoringOracle
     participant Market as CarbonCreditMarket
 
     %% Fase de Configuración
@@ -366,6 +409,10 @@ sequenceDiagram
     Oracle->>PM: receiveValidationResult(overlap: false)
     PM->>P: updateState(Validated)
     Admin/Staff->>PM: updateProjectStatus(project, Approved)
+
+    %% Scoring
+    CompanyOwner->>ScoringOracle: HTTP trigger con project id
+    ScoringOracle->>PM: receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
 
     %% Mercado
     CompanyOwner->>Market: buyFromAny(amount) + ETH

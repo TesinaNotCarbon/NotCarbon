@@ -4,12 +4,12 @@ This document describes the Solidity contracts in `src/`, how they interact, and
 
 ## System overview and interaction flow
 
-The protocol models a carbon-credit marketplace with separately deployed managers, company wallets, project contracts, an ERC-20 credit token, and an optional Chainlink CRE validation path. `RoleManager` is the shared authorization source for admin/staff actions. `CompanyManager` deploys and approves `Company` contracts, while `ProjectManager` deploys `Project` contracts and controls their lifecycle. `CarbonCreditToken` mints inventory into its own balance and only allows `ProjectManager` to distribute that inventory to newly created projects. `Project` contracts sell released token inventory according to milestone-based release rules. `CarbonCreditMarket` aggregates purchases across all registered projects, letting an approved company buy a target amount from any projects with available inventory. `CREValidationOracle` receives Chainlink CRE reports and forwards validation results back into `ProjectManager`, which can move projects from `Registered` to `Validated` before staff/admin approval advances them further.
+The protocol models a carbon-credit marketplace with separately deployed managers, company wallets, project contracts, an ERC-20 credit token, and optional Chainlink CRE validation/scoring paths. `RoleManager` is the shared authorization source for admin/staff actions. `CompanyManager` deploys and approves `Company` contracts, while `ProjectManager` deploys `Project` contracts, controls their lifecycle, and stores project scoring history. `CarbonCreditToken` mints inventory into its own balance and only allows `ProjectManager` to distribute that inventory to newly created projects. `Project` contracts sell released token inventory according to milestone-based release rules. `CarbonCreditMarket` aggregates purchases across all registered projects, letting an approved company buy a target amount from any projects with available inventory. `CREValidationOracle` receives Chainlink CRE reports and forwards validation results back into `ProjectManager`, which can move projects from `Registered` to `Validated` before staff/admin approval advances them further. `CREScoringOracle` receives Chainlink CRE scoring reports and forwards them to `ProjectManager` as immutable historical records.
 
 A typical flow is:
 
 1. Deploy and initialize upgradeable manager contracts and the token contract.
-2. Admin configures staff in `RoleManager` and, optionally, configures the validation oracle adapter in `ProjectManager`.
+2. Admin configures staff in `RoleManager` and, optionally, configures validation and scoring oracle adapters in `ProjectManager`.
 3. Staff/admin mint CCT inventory into the `CarbonCreditToken` contract.
 4. A user creates a `Company` via `CompanyManager`; staff/admin approve it.
 5. A project creator registers a project through `ProjectManager` with metadata, supply, and a unique cell id.
@@ -20,6 +20,7 @@ A typical flow is:
 10. An approved company buys directly from a project or indirectly through `CarbonCreditMarket`.
 11. ETH accumulates on each project contract and can be withdrawn by that project's creator.
 12. Buyers receive ERC-20 carbon-credit tokens; the `Company` contract also tracks an internal `carbonCredits` counter for purchases it initiates.
+13. The frontend/backend can trigger a Chainlink CRE scoring workflow for a project; CRE calls the scoring API and writes `(measurementDate, scoring, fraudScoring)` back on-chain through `CREScoringOracle`.
 
 ## Core contracts
 
@@ -85,7 +86,7 @@ A typical flow is:
 
 ### `ProjectManager.sol`
 
-1. `ProjectManager` is the central factory, registry, lifecycle controller, and validation receiver for carbon projects.
+1. `ProjectManager` is the central factory, registry, lifecycle controller, validation receiver, and scoring-history store for carbon projects.
 2. It is upgradeable with `Initializable`, `PausableUpgradeable`, and `UUPSUpgradeable`.
 3. It stores all project addresses in `projectList` and marks them in `registeredProjects`.
 4. `registerProject` enforces unique `cellId` values using both `usedCellIds` and the newer `cellIdRecords` structure.
@@ -99,8 +100,11 @@ A typical flow is:
 12. The validation request flow stores request ids, pending flags, request timestamps, and project mappings.
 13. `receiveValidationResult` is restricted to the configured validation oracle adapter.
 14. `_applyValidationResult` marks a project validated only when the report has no overlap and is not inconclusive.
-15. `mockValidationResult` supports local/testing operation but is disabled whenever a configured oracle is present.
-16. Pause protects validation and state transitions, while upgrade control is delegated to a dedicated upgrade controller.
+15. `mockValidationResult` supports local/testing operation but is disabled whenever a configured validation oracle is present.
+16. `setScoringOracleAdapter` configures the CRE scoring adapter that is allowed to write scoring results.
+17. `receiveProjectScoring` appends `(measurementDate, scoring, fraudScoring, storedAt)` to `projectScoringHistory` for a registered project.
+18. `getProjectScoringHistory`, `getProjectScoringCount`, `getProjectScoringAt`, and `getProjectCellId` support frontend/API discovery and historic scoring reads.
+19. Pause protects validation, scoring writes, and state transitions, while upgrade control is delegated to a dedicated upgrade controller.
 
 ### `Project.sol`
 
@@ -154,6 +158,19 @@ A typical flow is:
 13. The admin can change the receiver with `setReceiver`, allowing migration to a new manager if required.
 14. Ownership of the receiver-template controls is transferred to admin in the constructor.
 
+### `CREScoringOracle.sol`
+
+1. `CREScoringOracle` adapts Chainlink CRE reports to the project scoring interface.
+2. It extends `ReceiverTemplate`, so reports can only be delivered by the trusted Chainlink forwarder.
+3. The constructor requires a receiver, admin, and Chainlink forwarder address.
+4. The receiver is expected to be `ProjectManager`, because the oracle stores results through `receiveProjectScoring`.
+5. `_processReport` decodes `(address projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)` from the report payload.
+6. It rejects the zero project address and verifies the project is registered through `ProjectManager.isProjectRegistered`.
+7. It emits `ScoringReported` and forwards the result to `IProjectScoringReceiver(receiver).receiveProjectScoring`.
+8. The admin can change the receiver with `setReceiver`, allowing migration to a new manager if required.
+9. `isConfigured` returns true when the underlying receiver template has a non-zero forwarder address.
+10. Ownership of the receiver-template controls is transferred to admin in the constructor.
+
 ### `ReceiverTemplate.sol`
 
 1. `ReceiverTemplate` is an abstract Chainlink CRE receiver base contract.
@@ -165,7 +182,7 @@ A typical flow is:
 7. `onReport` rejects calls from any address other than the configured forwarder.
 8. Metadata decoding is implemented with inline assembly for efficient extraction of workflow id and author.
 9. After authorization and optional metadata checks, `onReport` delegates report-specific logic to `_processReport`.
-10. `_processReport` is abstract, forcing child contracts like `CREValidationOracle` to define the report payload format.
+10. `_processReport` is abstract, forcing child contracts like `CREValidationOracle` and `CREScoringOracle` to define the report payload format.
 11. The contract exposes ERC-165 support for `IReceiver`, making interface discovery possible.
 12. Custom errors are used for revert conditions, saving gas compared with long revert strings.
 
@@ -179,7 +196,7 @@ A typical flow is:
 4. The `metadata` parameter carries CRE metadata such as workflow id and author.
 5. The `report` parameter carries application-specific encoded data.
 6. `ReceiverTemplate` implements this interface and adds authorization checks.
-7. `CREValidationOracle` indirectly implements this interface through `ReceiverTemplate`.
+7. `CREValidationOracle` and `CREScoringOracle` indirectly implement this interface through `ReceiverTemplate`.
 8. Keeping this interface small makes it easy for Chainlink forwarders to call compatible receivers.
 9. It separates generic report transport from domain-specific decoding.
 10. The interface is intentionally independent of carbon-credit project types.
@@ -261,6 +278,20 @@ A typical flow is:
 8. `setValidationOracleAdapter` and `validationOracleAdapter` manage the external validation integration.
 9. `isValidationOracleConfigured` allows UI/test code to know whether real validation is available.
 10. `getAllProjects`, `isApprovedCellId`, and `getApprovedCellIds` support market routing and validation workflows.
+11. Scoring-specific methods are implemented directly on `ProjectManager` to configure `scoringOracleAdapter`, receive scoring callbacks, expose project cell ids, and read per-project scoring history.
+
+### `IProjectScoringReceiver.sol`
+
+1. `IProjectScoringReceiver` defines the callback endpoint for scoring results.
+2. It contains `receiveProjectScoring(address projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)`.
+3. `ProjectManager` implements this interface.
+4. `CREScoringOracle` calls this function after processing a Chainlink report.
+5. The project address identifies the on-chain project whose history should receive the score.
+6. `measurementDate` is the off-chain measurement timestamp/date returned by the scoring API.
+7. `scoring` and `fraudScoring` are stored as unsigned integers; callers should agree on the scale off-chain.
+8. The manager adds `storedAt` using the block timestamp when the score is written.
+9. Separating the receiver interface keeps scoring result delivery independent of validation request initiation.
+10. The callback is restricted in `ProjectManager` to the configured scoring oracle adapter.
 
 ### `IProjectValidationOracle.sol`
 
@@ -297,7 +328,7 @@ A typical flow is:
 5. **Interface-driven dependencies:** Contracts call each other through interfaces to reduce coupling and support replacement/mocking.
 6. **Role delegation:** Staff/admin checks are centralized in `RoleManager`, avoiding duplicated role mappings across the system.
 7. **Milestone-based vesting/release:** `Project` does not sell all allocated tokens immediately; release caps depend on lifecycle state.
-8. **Asynchronous oracle adapter:** `ProjectManager` requests validation through `IProjectValidationOracle` and receives results through `IProjectValidationReceiver`.
+8. **Asynchronous oracle adapters:** `ProjectManager` requests validation through `IProjectValidationOracle`, receives validation results through `IProjectValidationReceiver`, and receives scoring results through `IProjectScoringReceiver`.
 9. **Chainlink CRE receiver hardening:** `ReceiverTemplate` restricts report delivery to a trusted forwarder and can pin workflow id/author metadata.
 10. **Atomic aggregate buying:** `CarbonCreditMarket.buyFromAny` reverts unless the full requested amount can be filled.
 11. **ETH refund pattern:** Purchase functions calculate exact cost and refund overpayment using low-level `call` with success checks.
