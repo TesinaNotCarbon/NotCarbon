@@ -1,7 +1,0 @@
-{
-  "httpPublicKey": "0x0000000000000000000000000000000000000000",
-  "validationApiBaseUrl": "https://api.example.com",
-  "receiverAddress": "0x0000000000000000000000000000000000000000",
-  "chainSelector": "16015286601757825753",
-  "gasLimit": "300000"
-}

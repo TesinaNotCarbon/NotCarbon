@@ -73,7 +73,8 @@ classDiagram
         +updateProjectStatus(project, newState)
         +requestProjectValidation(project) bytes32
         +receiveValidationResult(requestId, overlap, inconclusive)
-        +receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
+        +requestProjectScoring(project) bytes32
+        +receiveProjectScoring(requestId, measurementDate, scoring, fraudScoring)
         +mockValidationResult(project, overlap, inconclusive)
         +setPricePerToken(price)
         +setValidationOracleAdapter(adapter)
@@ -133,14 +134,21 @@ classDiagram
         +setReceiver(receiver)
         +isConfigured() bool
         +requestValidation(projectAddress, cellId) bytes32
+        +getValidationRequest(requestId)
         #_processReport(report)
     }
 
     class CREScoringOracle {
         +address admin
         +address receiver
+        +uint256 requestNonce
+        +mapping scoringRequestExists
+        +mapping scoringRequestPending
+        +mapping requestProject
         +setReceiver(receiver)
         +isConfigured() bool
+        +requestScoring(projectAddress) bytes32
+        +getScoringRequest(requestId)
         #_processReport(report)
     }
 
@@ -162,6 +170,7 @@ classDiagram
     ProjectManager --> CarbonCreditToken : transferTokens to project
     ProjectManager --> CREValidationOracle : requestValidation
     ProjectManager <.. CREValidationOracle : receiveValidationResult
+    ProjectManager --> CREScoringOracle : requestScoring
     ProjectManager <.. CREScoringOracle : receiveProjectScoring
     ProjectManager <.. CarbonCreditMarket : getAllProjects
 
@@ -230,10 +239,12 @@ sequenceDiagram
     PM->>P: updateState(Approved)
     PM-->>PM: record approved cellId
 
-    CompanyOwner->>ScoringOracle: Trigger CRE scoring workflow off-chain
-    CL->>ScoringOracle: onReport(metadata, abi.encode(project, measurementDate, scoring, fraudScoring))
-    ScoringOracle->>PM: receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
-    PM-->>PM: append scoring history
+    CompanyOwner->>PM: requestProjectScoring(project)
+    PM->>ScoringOracle: requestScoring(project)
+    ScoringOracle-->>CL: emit ScoringRequested(requestId, project)
+    CL->>ScoringOracle: onReport(metadata, abi.encode(requestId, measurementDate, scoring, fraudScoring))
+    ScoringOracle->>PM: receiveProjectScoring(requestId, measurementDate, scoring, fraudScoring)
+    PM-->>PM: correlate request and append scoring history
 
     CompanyOwner->>Co: buyFromMarket(market, amount) + ETH
     Co->>Market: buyFromAny(amount, company) + ETH
@@ -283,13 +294,16 @@ sequenceDiagram
     participant Oracle as CREScoringOracle
     participant PM as ProjectManager
 
-    Frontend->>CRE: HTTP trigger(projectAddress)
-    CRE->>PM: getProjectCellId(projectAddress) / optional read
+    Frontend->>PM: requestProjectScoring(projectAddress)
+    PM->>Oracle: requestScoring(projectAddress)
+    Oracle-->>CRE: ScoringRequested(requestId, projectAddress) log
+    CRE->>Oracle: getScoringRequest(requestId)
+    CRE->>PM: getProjectCellId(projectAddress)
     CRE->>API: Request scoring data(project id/address)
-    API-->>CRE: measurementDate, scoring, fraudScoring
-    CRE->>Oracle: onReport(abi.encode(projectAddress, measurementDate, scoring, fraudScoring))
-    Oracle->>PM: receiveProjectScoring(projectAddress, measurementDate, scoring, fraudScoring)
-    PM-->>PM: Append scoring history
+    API-->>CRE: project_id, cell_id, measurementDate, scoring, fraudScoring
+    CRE->>Oracle: onReport(abi.encode(requestId, measurementDate, scoring, fraudScoring))
+    Oracle->>PM: receiveProjectScoring(requestId, measurementDate, scoring, fraudScoring)
+    PM-->>PM: Correlate request and append scoring history
 ```
 
 ## Validation callback sequence
@@ -355,7 +369,8 @@ classDiagram
         +updateProjectStatus(project, newState)
         +requestProjectValidation(project) bytes32
         +receiveValidationResult(requestId, overlap, inconclusive)
-        +receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
+        +requestProjectScoring(project) bytes32
+        +receiveProjectScoring(requestId, measurementDate, scoring, fraudScoring)
     }
 
     class Project {
@@ -411,8 +426,9 @@ sequenceDiagram
     Admin/Staff->>PM: updateProjectStatus(project, Approved)
 
     %% Scoring
-    CompanyOwner->>ScoringOracle: HTTP trigger con project id
-    ScoringOracle->>PM: receiveProjectScoring(project, measurementDate, scoring, fraudScoring)
+    CompanyOwner->>PM: requestProjectScoring(project)
+    PM->>ScoringOracle: requestScoring(project)
+    ScoringOracle->>PM: receiveProjectScoring(requestId, measurementDate, scoring, fraudScoring)
 
     %% Mercado
     CompanyOwner->>Market: buyFromAny(amount) + ETH

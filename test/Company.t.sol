@@ -66,6 +66,10 @@ contract MockProjectManagerForCompany is IProjectManager {
         return bytes32(0);
     }
 
+    function requestProjectScoring(address) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
     function getValidationStatus(address)
         external
         pure
@@ -82,11 +86,21 @@ contract MockProjectManagerForCompany is IProjectManager {
 
     function setValidationOracleAdapter(address) external pure override {}
 
+    function setScoringOracleAdapter(address) external pure override {}
+
     function validationOracleAdapter() external pure override returns (address) {
         return address(0);
     }
 
+    function scoringOracleAdapter() external pure override returns (address) {
+        return address(0);
+    }
+
     function isValidationOracleConfigured() external pure override returns (bool) {
+        return false;
+    }
+
+    function isScoringOracleConfigured() external pure override returns (bool) {
         return false;
     }
 
@@ -102,6 +116,10 @@ contract MockProjectManagerForCompany is IProjectManager {
     function getApprovedCellIds() external pure override returns (string[] memory) {
         string[] memory c = new string[](0);
         return c;
+    }
+
+    function getProjectCellId(address) external pure override returns (string memory) {
+        return "mock-cell";
     }
 }
 

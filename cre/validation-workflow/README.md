@@ -1,43 +1,22 @@
 # NotCarbon CRE validation workflow
 
-This workflow is triggered through CRE HTTP, calls the external polygon validation API, and writes a signed report to `CREValidationOracle`.
+EVM Log Trigger workflow for `CREValidationOracle.ValidationRequested` on Ethereum Sepolia.
 
-Expected trigger payload:
+Flow:
+1. Decode `ValidationRequested(bytes32,address,string)` from the trigger tx.
+2. Read `getValidationRequest(requestId)` from `CREValidationOracle` and trust only canonical `projectAddress`, `cellId`, `exists`, and `pending`.
+3. Call `POST /validate-polygon` with `{ "cell_id": cellId }`.
+4. Aggregate only `{ overlap, inconclusive }` with `consensusIdenticalAggregation`.
+5. Write `abi.encode(bytes32 requestId, bool overlap, bool inconclusive)` to the oracle and require `TxStatus.SUCCESS`.
 
-```json
-{
-  "request_id": "0x...",
-  "project_address": "0x...",
-  "cell_id": "bafy..."
-}
-```
-
-External API call:
-
-```http
-POST /validate-polygon
-Content-Type: application/json
-
-{ "cell_id": "bafy..." }
-```
-
-Report payload written onchain:
-
-```solidity
-abi.encode(bytes32 requestId, bool overlap, bool inconclusive)
-```
-
-Before deployment, update `config.json` with:
-
-- `httpPublicKey`: EVM address authorized to trigger the workflow.
-- `validationApiBaseUrl`: API origin without trailing slash.
-- `receiverAddress`: deployed `CREValidationOracle`.
-- `chainSelector`: Ethereum Sepolia defaults to `16015286601757825753`.
-- `gasLimit`: report submission gas limit.
-
-Run simulation after installing the CRE CLI:
+Run:
 
 ```bash
 npm install
-npm run simulate
+npm run typecheck
+cd ..
+cre workflow simulate validation-workflow --target staging-settings \
+  --trigger-index 0 --evm-tx-hash <TX_HASH> --evm-event-index <LOG_INDEX>
 ```
+
+Use `--broadcast --limits default` to send the on-chain report during simulation.

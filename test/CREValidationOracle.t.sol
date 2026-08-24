@@ -21,6 +21,12 @@ contract CREValidationOracleTest is BaseTest {
         validationOracle.requestValidation(address(0x1234), "CELL-001");
     }
 
+    function test_requestValidation_revertsForEmptyCellId() public {
+        vm.expectRevert("Invalid cell id.");
+        vm.prank(address(projectManager));
+        validationOracle.requestValidation(address(0x1234), "");
+    }
+
     function test_requestProjectValidation_returnsUniqueRequestIds() public {
         _bootstrapPriceAndMint(1 ether, 1000);
         Project project1 = _registerProject(creator, "Solar", "Solar farm", 200, "CELL-001");
@@ -34,6 +40,13 @@ contract CREValidationOracleTest is BaseTest {
         assertTrue(requestId1 != requestId2);
         assertTrue(validationOracle.validationRequestPending(requestId1));
         assertTrue(validationOracle.validationRequestPending(requestId2));
+
+        (address projectAddress, string memory cellId, bool exists, bool pending) =
+            validationOracle.getValidationRequest(requestId1);
+        assertEq(projectAddress, address(project1));
+        assertEq(cellId, "CELL-001");
+        assertTrue(exists);
+        assertTrue(pending);
     }
 
     function test_onReport_validResultValidatesProject() public {

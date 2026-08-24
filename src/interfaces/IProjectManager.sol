@@ -16,6 +16,8 @@ interface IProjectManager {
 
     function requestProjectValidation(address _projectAddress) external returns (bytes32);
 
+    function requestProjectScoring(address _projectAddress) external returns (bytes32);
+
     function getValidationStatus(address _projectAddress)
         external
         view
@@ -27,13 +29,22 @@ interface IProjectManager {
 
     function setValidationOracleAdapter(address _adapter) external;
 
+    function setScoringOracleAdapter(address _adapter) external;
+
     function validationOracleAdapter() external view returns (address);
 
+    function scoringOracleAdapter() external view returns (address);
+
     function isValidationOracleConfigured() external view returns (bool);
+
+    function isScoringOracleConfigured() external view returns (bool);
 
     function getAllProjects() external view returns (address[] memory);
 
     function isApprovedCellId(string memory _cellId) external view returns (bool);
 
     function getApprovedCellIds() external view returns (string[] memory);
+
+    function getProjectCellId(address _projectAddress) external view returns (string memory);
 }
+

@@ -11,6 +11,7 @@ import {ICompanyManager} from "./interfaces/ICompanyManager.sol";
 import {IProjectManager} from "./interfaces/IProjectManager.sol";
 import {IProject} from "./interfaces/IProject.sol";
 import {IProjectValidationOracle} from "./interfaces/IProjectValidationOracle.sol";
+import {IProjectScoringOracle} from "./interfaces/IProjectScoringOracle.sol";
 import {IProjectValidationReceiver} from "./interfaces/IProjectValidationReceiver.sol";
 import {IProjectScoringReceiver} from "./interfaces/IProjectScoringReceiver.sol";
 
@@ -70,6 +71,9 @@ contract ProjectManager is
 
     address public validationOracleAdapter;
     address public scoringOracleAdapter;
+    mapping(bytes32 => address) public scoringRequests;
+    mapping(address => bool) public scoringPending;
+    mapping(address => bytes32) public lastScoringRequestId;
 
     event ProjectRegistered(address indexed projectAddress, string name, string description, address creator);
     event ProjectStateUpdated(address indexed projectAddress, IProject.ProjectState newState);
@@ -80,8 +84,14 @@ contract ProjectManager is
     );
     event ValidationOracleAdapterUpdated(address indexed adapter);
     event ScoringOracleAdapterUpdated(address indexed adapter);
+    event ProjectScoringRequested(address indexed projectAddress, bytes32 indexed requestId);
     event ProjectScoringStored(
-        address indexed projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring, uint256 storedAt
+        address indexed projectAddress,
+        bytes32 indexed requestId,
+        uint256 measurementDate,
+        uint256 scoring,
+        uint256 fraudScoring,
+        uint256 storedAt
     );
 
     modifier onlyAdmin() {
@@ -139,7 +149,7 @@ contract ProjectManager is
         emit ValidationOracleAdapterUpdated(_adapter);
     }
 
-    function setScoringOracleAdapter(address _adapter) external onlyAdmin {
+    function setScoringOracleAdapter(address _adapter) external override onlyAdmin {
         require(_adapter != address(0), "Invalid scoring oracle adapter.");
         scoringOracleAdapter = _adapter;
         emit ScoringOracleAdapterUpdated(_adapter);
@@ -292,21 +302,61 @@ contract ProjectManager is
         return (status.validated, status.overlap, status.inconclusive, status.updatedAt);
     }
 
+    function isScoringOracleConfigured() public view override returns (bool) {
+        if (scoringOracleAdapter == address(0)) {
+            return false;
+        }
+        return IProjectScoringOracle(scoringOracleAdapter).isConfigured();
+    }
+
+    function requestProjectScoring(address _projectAddress) public override whenNotPaused returns (bytes32) {
+        require(registeredProjects[_projectAddress], "Project is not registered.");
+        IProject project = IProject(_projectAddress);
+        require(project.currentState() >= IProject.ProjectState.Approved, "Project must be approved first.");
+        require(!scoringPending[_projectAddress], "Scoring already pending.");
+        require(scoringOracleAdapter != address(0), "Scoring oracle not set.");
+        require(IProjectScoringOracle(scoringOracleAdapter).isConfigured(), "Scoring oracle not configured.");
+
+        bytes32 requestId = IProjectScoringOracle(scoringOracleAdapter).requestScoring(_projectAddress);
+        scoringRequests[requestId] = _projectAddress;
+        scoringPending[_projectAddress] = true;
+        lastScoringRequestId[_projectAddress] = requestId;
+
+        emit ProjectScoringRequested(_projectAddress, requestId);
+        return requestId;
+    }
+
     function receiveProjectScoring(
-        address _projectAddress,
+        bytes32 _requestId,
         uint256 _measurementDate,
         uint256 _scoring,
         uint256 _fraudScoring
     ) external override(IProjectScoringReceiver) onlyScoringOracleAdapter whenNotPaused {
-        require(registeredProjects[_projectAddress], "Project is not registered.");
+        address projectAddress = scoringRequests[_requestId];
+        require(projectAddress != address(0), "Unknown request id.");
+        require(scoringPending[projectAddress], "Scoring request already completed.");
+        require(lastScoringRequestId[projectAddress] == _requestId, "Unexpected scoring request id.");
+        require(
+            IProject(projectAddress).currentState() >= IProject.ProjectState.Approved, "Project must be approved first."
+        );
         require(_measurementDate != 0, "Invalid measurement date.");
+        require(_scoring <= 100, "Invalid scoring.");
+        require(_fraudScoring <= 100, "Invalid fraud scoring.");
+
+        ProjectScoring[] storage history = projectScoringHistory[projectAddress];
+        if (history.length != 0) {
+            require(_measurementDate > history[history.length - 1].measurementDate, "Measurement date must increase.");
+        }
 
         ProjectScoring memory scoring = ProjectScoring({
             measurementDate: _measurementDate, scoring: _scoring, fraudScoring: _fraudScoring, storedAt: block.timestamp
         });
-        projectScoringHistory[_projectAddress].push(scoring);
+        history.push(scoring);
+        scoringPending[projectAddress] = false;
 
-        emit ProjectScoringStored(_projectAddress, _measurementDate, _scoring, _fraudScoring, block.timestamp);
+        emit ProjectScoringStored(
+            projectAddress, _requestId, _measurementDate, _scoring, _fraudScoring, block.timestamp
+        );
     }
 
     function getProjectScoringHistory(address _projectAddress) external view returns (ProjectScoring[] memory) {
@@ -373,5 +423,5 @@ contract ProjectManager is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyUpgradeController {}
 
-    uint256[47] private __gap;
+    uint256[44] private __gap;
 }

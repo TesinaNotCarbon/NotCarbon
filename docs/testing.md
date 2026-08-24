@@ -42,12 +42,14 @@ MINT_AMOUNT=10000
 STAFF_ADDRESS=0xstaff_address
 ```
 
-Optional (CRE validation setup on Sepolia):
+Optional (CRE oracle setup on Sepolia):
 
 ```
 SET_CRE=1
 VALIDATION_ORACLE_ADAPTER=0xcre_validation_oracle
-CRE_FORWARDER=0xkeystone_forwarder
+SET_SCORING_CRE=1
+SCORING_ORACLE_ADAPTER=0xcre_scoring_oracle
+CRE_FORWARDER=0xmock_or_real_keystone_forwarder
 ```
 
 Optional (smoke test overrides):
@@ -138,79 +140,65 @@ forge script script/SmokeTest.s.sol:SmokeTest \
 
 ### CRE validation and scoring notes
 
-- If a CRE validation adapter is configured, the smoke test will request validation, print the HTTP trigger payload, and then stop.
-- Send that payload to the deployed CRE HTTP trigger. The workflow calls `POST /validate-polygon`, writes the report to `CREValidationOracle`, and `ProjectManager` applies the result.
-- After the CRE validation report is written onchain, re-run the smoke test with `PROJECT_ADDRESS` to continue the state progression.
-- Project scoring uses a separate `CREScoringOracle` adapter. The scoring workflow is intended to be triggered from the frontend/backend with a project identifier; CRE calls the scoring API and writes `(projectAddress, measurementDate, scoring, fraudScoring)` to `CREScoringOracle`.
+- Validation and scoring are two separate CRE workflows.
+- Both workflows use EVM Log Triggers, not external HTTP trigger payloads.
+- Validation reacts to `CREValidationOracle.ValidationRequested` and writes `abi.encode(bytes32 requestId, bool overlap, bool inconclusive)`.
+- Scoring reacts to `CREScoringOracle.ScoringRequested` and writes `abi.encode(bytes32 requestId, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)`.
+- Both workflows decode the event and then read canonical on-chain request state before calling APIs.
+- For local `cre workflow simulate --broadcast`, use the MockKeystoneForwarder returned by `cre workflow supported-chains --output json` and do **not** configure `expectedWorkflowId` or `expectedAuthor` on the receivers.
 - Historic scoring data can be verified with `ProjectManager.getProjectScoringHistory`, or paged with `getProjectScoringCount` and `getProjectScoringAt`.
 
-### Deploying the Chainlink CRE workflow
+### CRE simulation flow
 
-Use the official Chainlink CRE documentation for the current CLI install, environment setup, network support, forwarder addresses, workflow deployment command, and HTTP trigger invocation. The repository workflow code lives in `cre/validation-workflow/` and is designed to be deployed with that process.
+1. Authenticate with CRE and get the Sepolia mock forwarder:
 
-Recommended flow:
+```
+cre login
+export CRE_FORWARDER=$(cre workflow supported-chains --output json \
+  | jq -r '.[] | select(.chainName=="ethereum-testnet-sepolia") | .address')
+```
 
-1. Deploy the core contracts and `CREValidationOracle` first. `CREValidationOracle` must be deployed with the official CRE forwarder for the target network:
+2. Deploy the core contracts and both CRE oracles:
 
 ```
 export PROJECT_MANAGER_ADDRESS=0xproject_manager
-export CRE_FORWARDER=0xofficial_cre_forwarder
 
-forge script script/DeployCREValidation.s.sol:DeployCREValidation \
+forge script script/DeployCREOracles.s.sol:DeployCREOracles \
   --rpc-url "$RPC_URL" \
   --broadcast
 ```
 
-2. Edit `cre/validation-workflow/config.json` using the values from your deployment:
+3. Configure `cre/validation-workflow/config.staging.json` and `cre/scoring-workflow/config.staging.json` with deployed oracle addresses, Base64-encoded oracle addresses, API URLs, and `chainSelectorName: ethereum-testnet-sepolia`.
+
+4. Install and typecheck both workflows:
 
 ```
-{
-  "httpPublicKey": "0xauthorized_trigger_address",
-  "validationApiBaseUrl": "https://your-validation-api.example.com",
-  "receiverAddress": "0xCREValidationOracle",
-  "chainSelector": "16015286601757825753",
-  "gasLimit": "500000"
-}
+npm --prefix cre/validation-workflow install
+npm --prefix cre/validation-workflow run typecheck
+npm --prefix cre/scoring-workflow install
+npm --prefix cre/scoring-workflow run typecheck
 ```
 
-For Sepolia, `chainSelector` is `16015286601757825753`. Confirm this and the forwarder address against the Chainlink docs before deploying.
-
-3. Install and check the workflow locally:
+5. Request validation on-chain and capture the transaction hash/log index for `ValidationRequested`:
 
 ```
-cd cre/validation-workflow
-npm install
-npm run typecheck
-npm run simulate
+cast send "$PROJECT_MANAGER_ADDRESS" "requestProjectValidation(address)(bytes32)" "$PROJECT_ADDRESS" \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
 ```
 
-4. Deploy the workflow using the Chainlink CRE docs/CLI. After deployment, save the workflow id and, if provided by the CLI, the workflow author address.
-
-5. Lock the onchain receiver to the deployed workflow before real testing:
+6. Simulate validation first as dry-run, then broadcast:
 
 ```
-cast send "$VALIDATION_ORACLE_ADAPTER" \
-  "setExpectedWorkflowId(bytes32)" "$CRE_WORKFLOW_ID" \
-  --private-key "$PRIVATE_KEY" \
-  --rpc-url "$RPC_URL"
+cre workflow simulate cre/validation-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$VALIDATION_TX" --evm-event-index "$VALIDATION_EVENT_INDEX" \
+  --limits none
 
-cast send "$VALIDATION_ORACLE_ADAPTER" \
-  "setExpectedAuthor(address)" "$CRE_AUTHOR" \
-  --private-key "$PRIVATE_KEY" \
-  --rpc-url "$RPC_URL"
+cre workflow simulate cre/validation-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$VALIDATION_TX" --evm-event-index "$VALIDATION_EVENT_INDEX" \
+  --broadcast --limits default
 ```
 
-6. Trigger validation by calling `ProjectManager.requestProjectValidation(project)`, then send the emitted request data to the deployed CRE HTTP trigger:
-
-```
-{
-  "request_id": "0x...",
-  "project_address": "0x...",
-  "cell_id": "CELL-001"
-}
-```
-
-7. Verify the validation result onchain:
+7. Verify validation result:
 
 ```
 cast call "$PROJECT_MANAGER_ADDRESS" \
@@ -218,21 +206,29 @@ cast call "$PROJECT_MANAGER_ADDRESS" \
   --rpc-url "$RPC_URL"
 ```
 
-8. For scoring, deploy `CREScoringOracle` with the same official CRE forwarder, configure it through `ProjectManager.setScoringOracleAdapter`, and lock it to the scoring workflow id/author if desired. The scoring report payload must ABI-encode:
+8. After approval, request scoring and capture the `ScoringRequested` tx hash/log index:
 
 ```
-(address projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)
+cast send "$PROJECT_MANAGER_ADDRESS" "updateProjectStatus(address,uint8)" "$PROJECT_ADDRESS" 2 \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
+
+cast send "$PROJECT_MANAGER_ADDRESS" "requestProjectScoring(address)(bytes32)" "$PROJECT_ADDRESS" \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
 ```
 
-The workflow can resolve a project's cell id before calling the scoring API with:
+9. Simulate scoring first as dry-run, then broadcast:
 
 ```
-cast call "$PROJECT_MANAGER_ADDRESS" \
-  "getProjectCellId(address)(string)" "$PROJECT_ADDRESS" \
-  --rpc-url "$RPC_URL"
+cre workflow simulate cre/scoring-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$SCORING_TX" --evm-event-index "$SCORING_EVENT_INDEX" \
+  --limits none
+
+cre workflow simulate cre/scoring-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$SCORING_TX" --evm-event-index "$SCORING_EVENT_INDEX" \
+  --broadcast --limits default
 ```
 
-Verify stored scoring data with:
+10. Verify stored scoring data:
 
 ```
 cast call "$PROJECT_MANAGER_ADDRESS" \

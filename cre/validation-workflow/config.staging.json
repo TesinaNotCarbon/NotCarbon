@@ -1,0 +1,8 @@
+{
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "validationOracleAddress": "0x0000000000000000000000000000000000000000",
+  "validationOracleAddressBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "validationRequestedTopic0Base64": "g31K1ZS6d9kiBKrjz/L7nP7uga6Vdv+z7sU4ovyeKg8=",
+  "validationApiBaseUrl": "http://127.0.0.1:8000",
+  "gasLimit": "300000"
+}

@@ -40,7 +40,7 @@ forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadc
 - Configures roles (adds staff if provided).
 - Sets `pricePerToken`.
 - Mints tokens ensuring it covers the total tokens for the projects to be created.
-- Configures CRE validation (optional).
+- Configures CRE validation and scoring adapters (optional).
 - Creates two projects with different states: one stays unapproved and the other advances to `Milestone1` if mock is enabled.
 
 ### Flow
@@ -50,8 +50,9 @@ forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadc
 4. If `SETUP_PROJECTS=1`, computes the minimum mint required by the sum of tokens for both projects.
 5. Mints tokens if `MINT_AMOUNT > 0`.
 6. If `SET_CRE=1`, configures the CRE validation adapter and disables the mock.
-7. If `SETUP_PROJECTS=1`, registers two projects.
-8. If `ADVANCE_PROJECT2=1` and `MOCK_VALIDATION=1`, validates via mock and advances the second project to `Approved` and `Milestone1`.
+7. If `SET_SCORING_CRE=1`, configures the CRE scoring adapter.
+8. If `SETUP_PROJECTS=1`, registers two projects.
+9. If `ADVANCE_PROJECT2=1` and `MOCK_VALIDATION=1`, validates via mock and advances the second project to `Approved` and `Milestone1`.
 
 ### Basic environment variables
 - `PRIVATE_KEY` (required)
@@ -75,10 +76,12 @@ forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadc
 - `ADVANCE_PROJECT2` (optional, default 1)
 - `MOCK_VALIDATION` (optional, default 1)
 
-### CRE validation environment variables
-- `SET_CRE` (optional, default 0)
-- `VALIDATION_ORACLE_ADAPTER`
-- `CRE_FORWARDER` (optional in setup; required when deploying the adapter)
+### CRE oracle environment variables
+- `SET_CRE` (optional, default 0): configure validation adapter.
+- `VALIDATION_ORACLE_ADAPTER`: deployed `CREValidationOracle`.
+- `SET_SCORING_CRE` (optional, defaults to `SET_CRE`): configure scoring adapter.
+- `SCORING_ORACLE_ADAPTER`: deployed `CREScoringOracle`.
+- `CRE_FORWARDER` (optional in setup; required when deploying adapters): updates adapter forwarder if supplied.
 
 ### Preconditions and permissions
 - `setPricePerToken` requires staff or admin.
@@ -198,6 +201,7 @@ forge script script/Setup.s.sol:Setup --rpc-url $SEPOLIA_RPC_URL --broadcast --s
 
 Notes:
 - To use CRE validation, deploy `CREValidationOracle`, set `SET_CRE=1`, and fill `VALIDATION_ORACLE_ADAPTER`; `MOCK_VALIDATION` is automatically disabled.
+- To use CRE scoring, deploy `CREScoringOracle`, set `SET_SCORING_CRE=1`, and fill `SCORING_ORACLE_ADAPTER`.
 - Save deploy addresses, since Sepolia does not reset like anvil.
 
 ```bash
@@ -232,11 +236,40 @@ forge script script/Setup.s.sol:Setup --rpc-url http://127.0.0.1:8545 --broadcas
 forge script script/DeployCREValidation.s.sol:DeployCREValidation --rpc-url "$RPC_URL" --broadcast
 ```
 
-After the CRE workflow is deployed, configure the receiver with the workflow id if desired:
+For local `cre workflow simulate --broadcast` with MockKeystoneForwarder, do not set `expectedWorkflowId` or `expectedAuthor`; the mock forwarder does not provide that metadata.
+
+## DeployCREScoring.s.sol
+
+### What it does
+- Deploys `CREScoringOracle`.
+- Configures it as `ProjectManager.scoringOracleAdapter`.
+- Uses a CRE forwarder address for report verification.
+
+### Environment variables
+- `PRIVATE_KEY` (required)
+- `PROJECT_MANAGER_ADDRESS` (required)
+- `CRE_FORWARDER` (required)
+
+### Expected output
+- `CREScoringOracle`, `ProjectManager`, `CREForwarder`, and `Admin`.
 
 ```bash
-cast send "$VALIDATION_ORACLE_ADAPTER" "setExpectedWorkflowId(bytes32)" "$CRE_WORKFLOW_ID" \
-  --private-key "$PRIVATE_KEY" \
-  --rpc-url "$RPC_URL"
+forge script script/DeployCREScoring.s.sol:DeployCREScoring --rpc-url "$RPC_URL" --broadcast
+```
+
+## DeployCREOracles.s.sol
+
+### What it does
+- Deploys both `CREValidationOracle` and `CREScoringOracle`.
+- Configures both adapters in `ProjectManager`.
+- Uses the same CRE forwarder for both oracles.
+
+### Environment variables
+- `PRIVATE_KEY` (required)
+- `PROJECT_MANAGER_ADDRESS` (required)
+- `CRE_FORWARDER` (required)
+
+```bash
+forge script script/DeployCREOracles.s.sol:DeployCREOracles --rpc-url "$RPC_URL" --broadcast
 ```
 

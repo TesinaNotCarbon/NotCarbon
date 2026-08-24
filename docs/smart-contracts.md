@@ -20,7 +20,7 @@ A typical flow is:
 10. An approved company buys directly from a project or indirectly through `CarbonCreditMarket`.
 11. ETH accumulates on each project contract and can be withdrawn by that project's creator.
 12. Buyers receive ERC-20 carbon-credit tokens; the `Company` contract also tracks an internal `carbonCredits` counter for purchases it initiates.
-13. The frontend/backend can trigger a Chainlink CRE scoring workflow for a project; CRE calls the scoring API and writes `(measurementDate, scoring, fraudScoring)` back on-chain through `CREScoringOracle`.
+13. A caller requests project scoring on `ProjectManager`; CRE reacts to `ScoringRequested`, calls the scoring API, and writes `(requestId, measurementDate, scoring, fraudScoring)` back on-chain through `CREScoringOracle`.
 
 ## Core contracts
 
@@ -102,9 +102,10 @@ A typical flow is:
 14. `_applyValidationResult` marks a project validated only when the report has no overlap and is not inconclusive.
 15. `mockValidationResult` supports local/testing operation but is disabled whenever a configured validation oracle is present.
 16. `setScoringOracleAdapter` configures the CRE scoring adapter that is allowed to write scoring results.
-17. `receiveProjectScoring` appends `(measurementDate, scoring, fraudScoring, storedAt)` to `projectScoringHistory` for a registered project.
-18. `getProjectScoringHistory`, `getProjectScoringCount`, `getProjectScoringAt`, and `getProjectCellId` support frontend/API discovery and historic scoring reads.
-19. Pause protects validation, scoring writes, and state transitions, while upgrade control is delegated to a dedicated upgrade controller.
+17. `requestProjectScoring` requires a project in `Approved` or a later state, calls the scoring oracle adapter, and records request/pending state.
+18. `receiveProjectScoring` correlates a result with the pending request id, rejects invalid ranges and duplicate/non-increasing measurement dates, and appends `(measurementDate, scoring, fraudScoring, storedAt)` to `projectScoringHistory`.
+19. `getProjectScoringHistory`, `getProjectScoringCount`, `getProjectScoringAt`, and `getProjectCellId` support frontend/API discovery and historic scoring reads.
+20. Pause protects validation, scoring requests/writes, and state transitions, while upgrade control is delegated to a dedicated upgrade controller.
 
 ### `Project.sol`
 
@@ -150,26 +151,30 @@ A typical flow is:
 5. `requestValidation` can only be called by the configured receiver, preventing arbitrary request creation.
 6. Each validation request id is derived from chain id, oracle address, project address, cell id hash, and an incrementing nonce.
 7. The contract records whether requests exist, whether they are pending, the project address, and the cell id.
-8. `isConfigured` returns true when the underlying receiver template has a non-zero forwarder address.
-9. Chainlink reports enter through `ReceiverTemplate.onReport`, which then calls `_processReport`.
-10. `_processReport` decodes `(bytes32 requestId, bool overlap, bool inconclusive)` from the report payload.
-11. It rejects unknown or already completed request ids, then marks the request no longer pending.
-12. Finally it calls `IProjectValidationReceiver(receiver).receiveValidationResult` to update `ProjectManager`.
-13. The admin can change the receiver with `setReceiver`, allowing migration to a new manager if required.
-14. Ownership of the receiver-template controls is transferred to admin in the constructor.
+8. `requestValidation` rejects empty cell ids.
+9. `getValidationRequest(requestId)` exposes the canonical project address, cell id, existence flag, and pending flag for CRE workflows.
+10. `isConfigured` returns true when the underlying receiver template has a non-zero forwarder address.
+11. Chainlink reports enter through `ReceiverTemplate.onReport`, which then calls `_processReport`.
+12. `_processReport` decodes `(bytes32 requestId, bool overlap, bool inconclusive)` from the report payload.
+13. It rejects unknown or already completed request ids, then marks the request no longer pending.
+14. Finally it calls `IProjectValidationReceiver(receiver).receiveValidationResult` to update `ProjectManager`.
+15. The admin can change the receiver with `setReceiver`, allowing migration to a new manager if required.
+16. Ownership of the receiver-template controls is transferred to admin in the constructor.
 
 ### `CREScoringOracle.sol`
 
 1. `CREScoringOracle` adapts Chainlink CRE reports to the project scoring interface.
 2. It extends `ReceiverTemplate`, so reports can only be delivered by the trusted Chainlink forwarder.
 3. The constructor requires a receiver, admin, and Chainlink forwarder address.
-4. The receiver is expected to be `ProjectManager`, because the oracle stores results through `receiveProjectScoring`.
-5. `_processReport` decodes `(address projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)` from the report payload.
-6. It rejects the zero project address and verifies the project is registered through `ProjectManager.isProjectRegistered`.
-7. It emits `ScoringReported` and forwards the result to `IProjectScoringReceiver(receiver).receiveProjectScoring`.
-8. The admin can change the receiver with `setReceiver`, allowing migration to a new manager if required.
-9. `isConfigured` returns true when the underlying receiver template has a non-zero forwarder address.
-10. Ownership of the receiver-template controls is transferred to admin in the constructor.
+4. The receiver is expected to be `ProjectManager`, because only the receiver can create scoring requests and receive results.
+5. `requestScoring(projectAddress)` creates a request id, marks it pending, stores the canonical project, and emits `ScoringRequested` for the CRE EVM Log Trigger.
+6. `getScoringRequest(requestId)` exposes the canonical project address, existence flag, and pending flag for CRE workflows.
+7. `_processReport` decodes `(bytes32 requestId, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)` from the report payload.
+8. It rejects unknown requests, replays, zero measurement dates, and scores outside `0..100`.
+9. It emits `ScoringReported` and forwards the result to `IProjectScoringReceiver(receiver).receiveProjectScoring`.
+10. The admin can change the receiver with `setReceiver`, allowing migration to a new manager if required.
+11. `isConfigured` returns true when the underlying receiver template has a non-zero forwarder address.
+12. Ownership of the receiver-template controls is transferred to admin in the constructor.
 
 ### `ReceiverTemplate.sol`
 
@@ -268,29 +273,38 @@ A typical flow is:
 
 ### `IProjectManager.sol`
 
-1. `IProjectManager` defines the public API for project registration, lifecycle, validation, and discovery.
+1. `IProjectManager` defines the public API for project registration, lifecycle, validation, scoring, and discovery.
 2. `registerProject` creates a new project with metadata, token address, supply, and cell id.
 3. `updateProjectStatus` advances lifecycle state under role-controlled implementations.
 4. `requestProjectValidation` starts asynchronous validation through a configured oracle adapter.
-5. `getValidationStatus` exposes the last validation result for a project.
-6. `isProjectRegistered` lets callers confirm that an address belongs to the registry.
-7. `setPricePerToken` configures the default price used for newly deployed projects.
-8. `setValidationOracleAdapter` and `validationOracleAdapter` manage the external validation integration.
-9. `isValidationOracleConfigured` allows UI/test code to know whether real validation is available.
-10. `getAllProjects`, `isApprovedCellId`, and `getApprovedCellIds` support market routing and validation workflows.
-11. Scoring-specific methods are implemented directly on `ProjectManager` to configure `scoringOracleAdapter`, receive scoring callbacks, expose project cell ids, and read per-project scoring history.
+5. `requestProjectScoring` starts asynchronous scoring through a configured oracle adapter.
+6. `getValidationStatus` exposes the last validation result for a project.
+7. `isProjectRegistered` lets callers confirm that an address belongs to the registry.
+8. `setPricePerToken` configures the default price used for newly deployed projects.
+9. Validation adapter methods are `setValidationOracleAdapter`, `validationOracleAdapter`, and `isValidationOracleConfigured`.
+10. Scoring adapter methods are `setScoringOracleAdapter`, `scoringOracleAdapter`, and `isScoringOracleConfigured`.
+11. `getAllProjects`, `isApprovedCellId`, and `getApprovedCellIds` support market routing and validation workflows.
+12. `getProjectCellId` exposes canonical project cell ids for CRE/API reads.
+
+### `IProjectScoringOracle.sol`
+
+1. `IProjectScoringOracle` abstracts a scoring oracle adapter.
+2. `requestScoring` starts scoring for a project address and returns a request id.
+3. `isConfigured` lets `ProjectManager` reject requests when the oracle cannot receive reports.
+4. `ProjectManager` depends on this interface rather than the concrete CRE scoring oracle.
+5. The interface supports alternate scoring oracle implementations that follow the same request/pending/completed model.
 
 ### `IProjectScoringReceiver.sol`
 
 1. `IProjectScoringReceiver` defines the callback endpoint for scoring results.
-2. It contains `receiveProjectScoring(address projectAddress, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)`.
+2. It contains `receiveProjectScoring(bytes32 requestId, uint256 measurementDate, uint256 scoring, uint256 fraudScoring)`.
 3. `ProjectManager` implements this interface.
 4. `CREScoringOracle` calls this function after processing a Chainlink report.
-5. The project address identifies the on-chain project whose history should receive the score.
-6. `measurementDate` is the off-chain measurement timestamp/date returned by the scoring API.
-7. `scoring` and `fraudScoring` are stored as unsigned integers; callers should agree on the scale off-chain.
+5. The request id identifies the pending scoring request and lets `ProjectManager` recover the canonical project address.
+6. `measurementDate` is the off-chain measurement timestamp/date returned by the scoring API and must increase over history.
+7. `scoring` and `fraudScoring` are integer percentages in `0..100`.
 8. The manager adds `storedAt` using the block timestamp when the score is written.
-9. Separating the receiver interface keeps scoring result delivery independent of validation request initiation.
+9. Separating the receiver interface keeps scoring result delivery independent of request initiation.
 10. The callback is restricted in `ProjectManager` to the configured scoring oracle adapter.
 
 ### `IProjectValidationOracle.sol`
@@ -298,13 +312,13 @@ A typical flow is:
 1. `IProjectValidationOracle` abstracts a validation oracle adapter.
 2. `requestValidation` starts validation for a project address and its cell id.
 3. The function returns a `bytes32` request id for later correlation.
-4. `ProjectManager` depends on this interface rather than the concrete CRE oracle.
-5. `isConfigured` lets `ProjectManager` reject requests when the oracle cannot receive reports.
-6. The interface supports asynchronous validation because results are returned separately to the receiver.
-7. It is small enough to allow alternate oracle implementations in the future.
-8. `CREValidationOracle` is the current implementation.
-9. The cell id parameter links on-chain projects to off-chain geospatial validation inputs.
-10. The interface is part of the adapter pattern between protocol contracts and Chainlink CRE.
+4. `getValidationRequest` lets CRE workflows read canonical request data before performing off-chain work.
+5. `ProjectManager` depends on this interface rather than the concrete CRE oracle.
+6. `isConfigured` lets `ProjectManager` reject requests when the oracle cannot receive reports.
+7. The interface supports asynchronous validation because results are returned separately to the receiver.
+8. It is small enough to allow alternate oracle implementations in the future.
+9. `CREValidationOracle` is the current implementation.
+10. The cell id parameter links on-chain projects to off-chain geospatial validation inputs.
 
 ### `IProjectValidationReceiver.sol`
 
@@ -328,7 +342,7 @@ A typical flow is:
 5. **Interface-driven dependencies:** Contracts call each other through interfaces to reduce coupling and support replacement/mocking.
 6. **Role delegation:** Staff/admin checks are centralized in `RoleManager`, avoiding duplicated role mappings across the system.
 7. **Milestone-based vesting/release:** `Project` does not sell all allocated tokens immediately; release caps depend on lifecycle state.
-8. **Asynchronous oracle adapters:** `ProjectManager` requests validation through `IProjectValidationOracle`, receives validation results through `IProjectValidationReceiver`, and receives scoring results through `IProjectScoringReceiver`.
+8. **Asynchronous oracle adapters:** `ProjectManager` requests validation through `IProjectValidationOracle`, requests scoring through `IProjectScoringOracle`, and receives validation/scoring results through receiver interfaces.
 9. **Chainlink CRE receiver hardening:** `ReceiverTemplate` restricts report delivery to a trusted forwarder and can pin workflow id/author metadata.
 10. **Atomic aggregate buying:** `CarbonCreditMarket.buyFromAny` reverts unless the full requested amount can be filled.
 11. **ETH refund pattern:** Purchase functions calculate exact cost and refund overpayment using low-level `call` with success checks.

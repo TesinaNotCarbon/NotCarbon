@@ -1,0 +1,9 @@
+{
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "scoringOracleAddress": "0x0000000000000000000000000000000000000000",
+  "scoringOracleAddressBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "scoringRequestedTopic0Base64": "mWK3WCIMwt781nif8gCFzRJwONL4H1fANSz3aMb2Rio=",
+  "projectManagerAddress": "0x0000000000000000000000000000000000000000",
+  "scoringApiBaseUrl": "http://127.0.0.1:3000",
+  "gasLimit": "350000"
+}
