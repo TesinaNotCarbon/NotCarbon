@@ -217,3 +217,189 @@ cast send <CONTRACT_ADDRESS> "addStaff(address)" <STAFF_ADDRESS> \
 	https://sepolia.etherscan.io/address/0x0B006416CBDB9b0CDc1f72A9ffD14d07fA3f9aE2
 7. COMPANY_EXAMPLE=0xE3526F7FB453C1201Fc3a256bE0ee5B27AdBa97A
 	https://sepolia.etherscan.io/address/0xE3526F7FB453C1201Fc3a256bE0ee5B27AdBa97A
+
+## CRE Sepolia end-to-end simulation (no DON deployment)
+
+This demo uses two local CRE simulations with real Sepolia RPC/HTTP calls and on-chain writes through the tenant MockKeystoneForwarder. Do **not** deploy workflows to a DON and do **not** configure `expectedWorkflowId`, `expectedAuthor`, or metadata validation on the oracle receivers; the mock forwarder used by `cre workflow simulate --broadcast` does not provide that metadata.
+
+### 1. Authenticate and get the mock forwarder
+
+```bash
+cre login
+cre whoami
+
+export CRE_FORWARDER=$(cre workflow supported-chains --output json \
+  | jq -r '.[] | select(.chainName=="ethereum-testnet-sepolia") | .address')
+echo "$CRE_FORWARDER"
+```
+
+### 2. Deploy and configure contracts on Sepolia
+
+```bash
+export PRIVATE_KEY=0x...
+export RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+
+forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
+
+export PROJECT_MANAGER_ADDRESS=<ProjectManager proxy from Deploy output>
+export CARBON_CREDIT_TOKEN_ADDRESS=<CarbonCreditToken proxy from Deploy output>
+
+forge script script/DeployCREOracles.s.sol:DeployCREOracles \
+  --rpc-url "$RPC_URL" --broadcast
+
+export VALIDATION_ORACLE_ADDRESS=<CREValidationOracle from output>
+export SCORING_ORACLE_ADDRESS=<CREScoringOracle from output>
+```
+
+Configure the workflow JSON files. The log triggers use Base64-encoded addresses/topics.
+
+```bash
+addr_b64() { python3 - <<'PY' "$1"
+import base64, sys
+print(base64.b64encode(bytes.fromhex(sys.argv[1][2:])).decode())
+PY
+}
+
+export VALIDATION_API_BASE_URL=http://127.0.0.1:8000
+export SCORING_API_BASE_URL=http://127.0.0.1:3000
+
+jq --arg a "$VALIDATION_ORACLE_ADDRESS" \
+   --arg b "$(addr_b64 "$VALIDATION_ORACLE_ADDRESS")" \
+   --arg api "$VALIDATION_API_BASE_URL" \
+   '.validationOracleAddress=$a | .validationOracleAddressBase64=$b | .validationApiBaseUrl=$api' \
+   cre/validation-workflow/config.staging.json > /tmp/validation-config.json \
+   && mv /tmp/validation-config.json cre/validation-workflow/config.staging.json
+
+jq --arg a "$SCORING_ORACLE_ADDRESS" \
+   --arg b "$(addr_b64 "$SCORING_ORACLE_ADDRESS")" \
+   --arg pm "$PROJECT_MANAGER_ADDRESS" \
+   --arg api "$SCORING_API_BASE_URL" \
+   '.scoringOracleAddress=$a | .scoringOracleAddressBase64=$b | .projectManagerAddress=$pm | .scoringApiBaseUrl=$api' \
+   cre/scoring-workflow/config.staging.json > /tmp/scoring-config.json \
+   && mv /tmp/scoring-config.json cre/scoring-workflow/config.staging.json
+```
+
+Topic constants already in config:
+
+- `ValidationRequested(bytes32,address,string)`: `g31K1ZS6d9kiBKrjz/L7nP7uga6Vdv+z7sU4ovyeKg8=`
+- `ScoringRequested(bytes32,address)`: `mWK3WCIMwt781nif8gCFzRJwONL4H1fANSz3aMb2Rio=`
+
+### 3. Start the APIs
+
+```bash
+# terminal 1
+cd ../AreaValidationAPI
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# terminal 2
+cd ../ScoringAPI
+export AI_PROVIDER=deterministic
+export BLOCKCHAIN_ADAPTER=web3
+export RPC_URL=$RPC_URL
+export PROJECT_MANAGER_ADDRESS=$PROJECT_MANAGER_ADDRESS
+export PROJECT_MANAGER_ABI_PATH=../NotCarbon/out/ProjectManager.sol/ProjectManager.json
+uvicorn main:app --host 127.0.0.1 --port 3000
+```
+
+### 4. Create a project and request validation on-chain
+
+```bash
+cast send "$PROJECT_MANAGER_ADDRESS" "setPricePerToken(uint256)" 10000000000000000 \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
+cast send "$CARBON_CREDIT_TOKEN_ADDRESS" "mint(uint256)" 1000 \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
+
+export PROJECT_ADDRESS=$(cast send "$PROJECT_MANAGER_ADDRESS" \
+  "registerProject(string,string,address,uint256,string)(address)" \
+  "CRE demo" "Sepolia CRE validation/scoring demo" "$CARBON_CREDIT_TOKEN_ADDRESS" 100 "healthy-forest-cell" \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL" --json | jq -r '.logs[-1].topics[1]' | cast parse-bytes32-address)
+
+export VALIDATION_TX=$(cast send "$PROJECT_MANAGER_ADDRESS" "requestProjectValidation(address)(bytes32)" "$PROJECT_ADDRESS" \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL" --json | jq -r '.transactionHash')
+
+export VALIDATION_EVENT_INDEX=$(cast receipt "$VALIDATION_TX" --rpc-url "$RPC_URL" --json \
+  | jq -r --arg a "${VALIDATION_ORACLE_ADDRESS,,}" --arg t "0x837d4ad594ba77d92204aae3cff2fb9cfeee81ae9576ffb3eec538a2fc9e2a0f" \
+    '.logs | to_entries[] | select((.value.address|ascii_downcase)==$a and .value.topics[0]==$t) | .key')
+echo "$VALIDATION_TX $VALIDATION_EVENT_INDEX"
+```
+
+### 5. Simulate validation: dry-run, then broadcast
+
+```bash
+cd cre
+npm --prefix validation-workflow install
+npm --prefix validation-workflow run typecheck
+
+cre workflow simulate validation-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$VALIDATION_TX" --evm-event-index "$VALIDATION_EVENT_INDEX" \
+  --limits none
+
+cre workflow simulate validation-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$VALIDATION_TX" --evm-event-index "$VALIDATION_EVENT_INDEX" \
+  --broadcast --limits default
+cd ..
+```
+
+Verify validation state:
+
+```bash
+cast call "$PROJECT_MANAGER_ADDRESS" \
+  "getValidationStatus(address)(bool,bool,bool,uint256)" "$PROJECT_ADDRESS" --rpc-url "$RPC_URL"
+```
+
+Approve the validated project before scoring:
+
+```bash
+cast send "$PROJECT_MANAGER_ADDRESS" "updateProjectStatus(address,uint8)" "$PROJECT_ADDRESS" 2 \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
+```
+
+### 6. Request scoring and simulate scoring
+
+```bash
+export SCORING_TX=$(cast send "$PROJECT_MANAGER_ADDRESS" "requestProjectScoring(address)(bytes32)" "$PROJECT_ADDRESS" \
+  --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL" --json | jq -r '.transactionHash')
+
+export SCORING_EVENT_INDEX=$(cast receipt "$SCORING_TX" --rpc-url "$RPC_URL" --json \
+  | jq -r --arg a "${SCORING_ORACLE_ADDRESS,,}" --arg t "0x9962b758220cc2defcd6789ff20085cd127038d2f81f57c0352cf768c6f6462a" \
+    '.logs | to_entries[] | select((.value.address|ascii_downcase)==$a and .value.topics[0]==$t) | .key')
+echo "$SCORING_TX $SCORING_EVENT_INDEX"
+
+cd cre
+npm --prefix scoring-workflow install
+npm --prefix scoring-workflow run typecheck
+
+cre workflow simulate scoring-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$SCORING_TX" --evm-event-index "$SCORING_EVENT_INDEX" \
+  --limits none
+
+cre workflow simulate scoring-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$SCORING_TX" --evm-event-index "$SCORING_EVENT_INDEX" \
+  --broadcast --limits default
+cd ..
+```
+
+Verify scoring history:
+
+```bash
+cast call "$PROJECT_MANAGER_ADDRESS" "getProjectScoringCount(address)(uint256)" "$PROJECT_ADDRESS" --rpc-url "$RPC_URL"
+cast call "$PROJECT_MANAGER_ADDRESS" "getProjectScoringAt(address,uint256)(uint256,uint256,uint256,uint256)" \
+  "$PROJECT_ADDRESS" 0 --rpc-url "$RPC_URL"
+```
+
+### 7. Replay rejection demo
+
+Run the same broadcast simulation again with the same tx hash and event index:
+
+```bash
+cd cre
+cre workflow simulate validation-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$VALIDATION_TX" --evm-event-index "$VALIDATION_EVENT_INDEX" \
+  --broadcast --limits default
+
+cre workflow simulate scoring-workflow --target staging-settings --non-interactive \
+  --trigger-index 0 --evm-tx-hash "$SCORING_TX" --evm-event-index "$SCORING_EVENT_INDEX" \
+  --broadcast --limits default
+```
+
+Expected result: validation fails before writing because the canonical request is no longer pending, and scoring fails because `CREScoringOracle` rejects the completed request replay.

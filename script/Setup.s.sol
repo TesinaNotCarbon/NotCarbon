@@ -8,6 +8,7 @@ import {ProjectManager} from "../src/ProjectManager.sol";
 import {CarbonCreditToken} from "../src/CarbonCreditToken.sol";
 import {IProject} from "../src/interfaces/IProject.sol";
 import {CREValidationOracle} from "../src/oracles/CREValidationOracle.sol";
+import {CREScoringOracle} from "../src/oracles/CREScoringOracle.sol";
 
 contract Setup is Script {
     function run() external {
@@ -20,6 +21,7 @@ contract Setup is Script {
         uint256 pricePerToken = vm.envOr("PRICE_PER_TOKEN", uint256(10));
         uint256 mintAmount = vm.envOr("MINT_AMOUNT", uint256(10000));
         uint256 setCre = vm.envOr("SET_CRE", uint256(0));
+        uint256 setScoringCre = vm.envOr("SET_SCORING_CRE", setCre);
         uint256 setupProjects = vm.envOr("SETUP_PROJECTS", uint256(1));
         uint256 mockValidation = vm.envOr("MOCK_VALIDATION", uint256(1));
         uint256 advanceProject2 = vm.envOr("ADVANCE_PROJECT2", uint256(1));
@@ -67,6 +69,15 @@ contract Setup is Script {
             mockValidation = 0;
         }
 
+        if (setScoringCre == 1) {
+            address scoringOracleAdapter = vm.envAddress("SCORING_ORACLE_ADAPTER");
+            address creForwarder = vm.envOr("CRE_FORWARDER", address(0));
+            projectManager.setScoringOracleAdapter(scoringOracleAdapter);
+            if (creForwarder != address(0)) {
+                CREScoringOracle(scoringOracleAdapter).setForwarderAddress(creForwarder);
+            }
+        }
+
         address project1Address = address(0);
         address project2Address = address(0);
 
@@ -97,6 +108,9 @@ contract Setup is Script {
         console2.log("MintAmount:", mintAmount);
         if (setCre == 1) {
             console2.log("CREValidation: enabled");
+        }
+        if (setScoringCre == 1) {
+            console2.log("CREScoring: enabled");
         }
         if (setupProjects == 1) {
             console2.log("Project1:", project1Address);

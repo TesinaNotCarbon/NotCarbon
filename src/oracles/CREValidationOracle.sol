@@ -55,6 +55,7 @@ contract CREValidationOracle is IProjectValidationOracle, ReceiverTemplate {
     {
         require(isConfigured(), "CRE forwarder not set.");
         require(projectAddress != address(0), "Invalid project address.");
+        require(bytes(cellId).length != 0, "Invalid cell id.");
 
         uint256 nonce = ++requestNonce;
         bytes32 requestId =
@@ -67,6 +68,20 @@ contract CREValidationOracle is IProjectValidationOracle, ReceiverTemplate {
 
         emit ValidationRequested(requestId, projectAddress, cellId);
         return requestId;
+    }
+
+    function getValidationRequest(bytes32 requestId)
+        external
+        view
+        override
+        returns (address projectAddress, string memory cellId, bool exists, bool pending)
+    {
+        return (
+            requestProject[requestId],
+            requestCellId[requestId],
+            validationRequestExists[requestId],
+            validationRequestPending[requestId]
+        );
     }
 
     function _processReport(bytes calldata report) internal override {

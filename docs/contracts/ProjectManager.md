@@ -20,7 +20,9 @@
 - `mockValidationResult(address _projectAddress, bool _overlap, bool _inconclusive)`: admin-only local/test validation path when no validation oracle is configured.
 - `getAllProjects()`: returns all registered projects.
 - `getValidationStatus(address _projectAddress)`: returns the latest validation status tuple.
-- `receiveProjectScoring(address _projectAddress, uint256 _measurementDate, uint256 _scoring, uint256 _fraudScoring)`: scoring-oracle-adapter-only callback that appends a scoring record to the project's history.
+- `isScoringOracleConfigured()`: returns whether the scoring oracle adapter is present and configured.
+- `requestProjectScoring(address _projectAddress)`: starts oracle scoring for an approved-or-later project and records the pending request id.
+- `receiveProjectScoring(bytes32 _requestId, uint256 _measurementDate, uint256 _scoring, uint256 _fraudScoring)`: scoring-oracle-adapter-only callback that correlates the result with a pending request and appends a scoring record to the project's history.
 - `getProjectScoringHistory(address _projectAddress)`: returns all stored scoring records for a project.
 - `getProjectScoringCount(address _projectAddress)`: returns the number of stored scoring records for a project.
 - `getProjectScoringAt(address _projectAddress, uint256 _index)`: returns one historical scoring record.
@@ -35,4 +37,4 @@
 
 Validation is asynchronous: the manager calls `IProjectValidationOracle.requestValidation`, records request metadata, and later receives the result through `receiveValidationResult`. A project becomes `Validated` only when the oracle reports no overlap and not inconclusive. Approved cell ids are recorded once and exposed for downstream validation workflows.
 
-Scoring is also asynchronous, but it is initiated off-chain through the Chainlink CRE HTTP trigger rather than by a manager request function. The frontend or backend triggers the CRE scoring workflow with the project identifier, CRE calls the scoring API, and `CREScoringOracle` forwards the ABI-decoded result to `receiveProjectScoring`. Only the configured `scoringOracleAdapter` can write scores, and every score is appended to `projectScoringHistory` with `measurementDate`, `scoring`, `fraudScoring`, and `storedAt`. Pause protects validation, scoring writes, and state-update flows, while upgrade authority is isolated in `upgradeController`.
+Scoring is asynchronous and follows the same request/pending/completed model as validation. `requestProjectScoring` requires the project to be `Approved` or later, calls `IProjectScoringOracle.requestScoring`, and records `scoringRequests`, `scoringPending`, and `lastScoringRequestId`. CRE reacts to the oracle's `ScoringRequested` EVM log, reads canonical request/project state, calls the scoring API, and writes the report to `CREScoringOracle`. Only the configured `scoringOracleAdapter` can call `receiveProjectScoring`. The manager correlates the result by request id, rejects unknown/completed requests, rejects zero dates and scores outside `0..100`, rejects duplicate/non-increasing measurement dates, clears the pending flag, and appends `(measurementDate, scoring, fraudScoring, storedAt)` to `projectScoringHistory`. Pause protects validation, scoring requests/writes, and state-update flows, while upgrade authority is isolated in `upgradeController`.
